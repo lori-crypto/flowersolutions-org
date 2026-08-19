@@ -60,8 +60,26 @@ body.editing .hint{display:block}
   background:none; border:none; color:var(--accent); cursor:pointer; width:100%}
 
 /* ── tábla ────────────────────────────────────────────────── */
-.sheet{padding:18px 16px 26px; overflow-x:auto}
-.paper{min-width:1160px; max-width:1500px; margin:0 auto}
+.sheet{padding:18px 20px 26px; overflow-x:auto}
+.paper{min-width:1160px; margin:0 auto} /* nincs felső plafon: kitölti a képernyőt */
+
+/* nagy képernyőn arányosan nagyobb tipográfia */
+@media (min-width:1700px){
+  body{font-size:15px}
+  .div-head .name{font-size:15px; min-height:38px}
+  .div-lead{font-size:13px}
+  .dept-title .dname{font-size:13.5px}
+  .dept-lead{font-size:12.5px}
+  .post-name{font-size:13px}
+  .holder-chip{font-size:12px}
+  .holder-chip .avatar{width:20px; height:20px; font-size:9px}
+  .dept-evt{font-size:12px}
+  .div-evt .box{font-size:12.5px}
+  .post-detail{font-size:12.5px}
+  .org-evt{font-size:15px}
+  .ceo .who{font-size:17px}
+  .glead .who{font-size:15px}
+}
 .center-msg{padding:60px 20px; text-align:center; color:var(--muted)}
 
 .ceo-row{display:flex; justify-content:center}

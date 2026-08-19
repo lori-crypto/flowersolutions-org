@@ -266,7 +266,7 @@ export default function TablaPage() {
         </div>
 
         {/* csoportvezetők */}
-        <div className="gridN glead-row" style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }}>
+        <div className="gridN glead-row" style={{ gridTemplateColumns: `repeat(${N}, minmax(0,1fr))` }}>
           {board.groups.map(g => {
             const idxs = groupIdx(g);
             if (!idxs.length) return null;
@@ -310,7 +310,7 @@ export default function TablaPage() {
         </div>
 
         {/* osztályok */}
-        <div className="gridN" style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }}>
+        <div className="gridN" style={{ gridTemplateColumns: `repeat(${N}, minmax(0,1fr))` }}>
           {divisions.map((d, di) => (
             <div className="division" key={d.id} id={"div-" + di}>
               <div className="div-head" style={{ background: d.color }}>

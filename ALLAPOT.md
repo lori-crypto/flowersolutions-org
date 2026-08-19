@@ -24,7 +24,12 @@ Utolsó frissítés: 2026-08-19
 - ✅ Vercel production él: https://flowersolutions-org-six.vercel.app
 - ✅ Mobil UI csiszolás (telefonon jóváhagyva): A/B csoport egy sorban fele-fele,
   osztályválasztó csík ki, nyelvválasztó legördülő, nagy érintőfelületek
-- ✅ ↻ frissítés gomb + automatikus adat-újratöltés előtérbe kerüléskor (PWA)
+- ✅ ↻ frissítés gomb (teljes újratöltés: app-kód + adat) + automatikus adat-frissítés
+  előtérbe kerüléskor (PWA)
+- ✅ Vissza-gesztus javítva (login nem marad az előzményekben) — telefonon ellenőrizve
+- ✅ Osztályfejléc: név + vezető középen, felirat nélkül
+- ✅ Személyek rendezve: Kovacs Lorand (admin, lori@...), Kovacs Borbala
+  (flori.mures@..., olvasó) — fiókok személyekhez kötve, duplikátum törölve
 
 ## Következik
 
