@@ -327,8 +327,8 @@ export default function TablaPage() {
                 <div className="name">{pick(d.name_hu, d.name_ro)}</div>
                 <div className="div-lead">
                   {holderNames(d.leadPost).length
-                    ? <><b>{holderNames(d.leadPost).join(", ")}</b> <span className="rl">— {t("division_leader")}</span></>
-                    : <><span className="empty-tag">{t("vacant")}</span> <span className="rl">{t("division_leader")}</span></>}
+                    ? <b>{holderNames(d.leadPost).join(", ")}</b>
+                    : <span className="empty-tag">{t("vacant")}</span>}
                   {d.leadPost
                     ? <button className="pencil edit-only"
                         onClick={() => openPostForm(d.leadPost, { division_id: d.id, lead_level: "osztalyvezeto" }, t("edit_post"), false)}>✎</button>
