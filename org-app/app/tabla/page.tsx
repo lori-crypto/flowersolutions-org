@@ -210,8 +210,11 @@ export default function TablaPage() {
       <header className="appbar">
         <span className="t">{board.org.name} — {t("org_board")}</span>
         <span className="sp" />
-        <button className={"lang-btn" + (lang === "hu" ? " active" : "")} onClick={() => setLang("hu")}>HU</button>
-        <button className={"lang-btn" + (lang === "ro" ? " active" : "")} onClick={() => setLang("ro")}>RO</button>
+        <select className="lang-select" value={lang}
+                onChange={e => setLang(e.target.value as "hu" | "ro")} aria-label="Nyelv / Limba">
+          <option value="hu">HU — magyar</option>
+          <option value="ro">RO — română</option>
+        </select>
         {canEdit && (
           <label className="switch" onClick={e => { e.preventDefault(); setEditing(v => !v); }}>
             <span className="track"><span className="knob" /></span>
@@ -221,15 +224,6 @@ export default function TablaPage() {
         <button className="lang-btn" onClick={signOut}>{t("sign_out")}</button>
       </header>
       <div className="hint">{t("edit_hint")}</div>
-
-      <nav className="mnav">
-        {divisions.map((d, i) => (
-          <button className="chip" key={d.id} style={{ background: d.color }}
-            onClick={() => document.getElementById("div-" + i)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" })}>
-            {d.code} · {pick(d.name_hu, d.name_ro).split(" ")[0]}
-          </button>
-        ))}
-      </nav>
 
       <div className="sheet"><div className="paper">
         {/* Ügyvezető */}
