@@ -259,7 +259,7 @@ export default function TablaPage() {
         </div>
 
         {/* csoportvezetők */}
-        <div className="gridN" style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }}>
+        <div className="gridN glead-row" style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }}>
           {board.groups.map(g => {
             const idxs = groupIdx(g);
             if (!idxs.length) return null;

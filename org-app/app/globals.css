@@ -80,8 +80,8 @@ body.editing .hint{display:block}
 .glead .who{font-weight:650; font-size:13.5px; display:flex; align-items:center; gap:7px; justify-content:center}
 
 .division{background:var(--card); border:1px solid var(--line); border-radius:12px;
-  display:flex; flex-direction:column; overflow:hidden; box-shadow:0 1px 4px rgba(20,30,50,.07)}
-.div-head{color:#fff; padding:8px 10px}
+  display:flex; flex-direction:column; box-shadow:0 1px 4px rgba(20,30,50,.07)}
+.div-head{color:#fff; padding:8px 10px; border-radius:11px 11px 0 0}
 .div-head .num{font-size:9.5px; font-weight:700; opacity:.85; letter-spacing:.1em; display:flex; justify-content:space-between}
 .div-head .name{font-size:13px; font-weight:700; line-height:1.25; min-height:33px}
 .div-head .pencil,.div-head .del{color:#fff}
@@ -125,7 +125,8 @@ body.editing .hint{display:block}
   .post:hover{z-index:41}
 }
 
-.div-evt{margin-top:auto; border-top:2px solid var(--line); padding:8px 9px; background:#fbfcfd}
+.div-evt{margin-top:auto; border-top:2px solid var(--line); padding:8px 9px; background:#fbfcfd;
+  border-radius:0 0 11px 11px}
 .div-evt .box{border:2px solid; border-radius:9px; padding:6px 8px; font-size:11px; line-height:1.35}
 .div-evt .box b{display:block; font-size:9px; letter-spacing:.1em; margin-bottom:2px}
 
@@ -171,18 +172,39 @@ body.editing .hint{display:block}
 /* ── mobil ────────────────────────────────────────────────── */
 .mnav{display:none}
 @media (max-width:900px){
+  body{font-size:15px}
   .sheet{padding:10px 0 18px; overflow:visible}
   .paper{min-width:0}
   .ceo-row{padding:0 12px}
+  .ceo{width:100%}
   .wires{display:none}
   .gridN{display:flex; overflow-x:auto; scroll-snap-type:x mandatory; gap:12px;
     padding:10px 12px; scrollbar-width:none}
   .gridN::-webkit-scrollbar{display:none}
-  .glead{min-width:75vw; scroll-snap-align:center; grid-column:auto !important}
-  .division{width:86vw; flex:0 0 auto; scroll-snap-align:center}
+  /* csoportvezetők: nem külön csúszka, hanem egymás alatt, teljes szélességben */
+  .glead-row{flex-direction:column; overflow-x:visible; scroll-snap-type:none; gap:8px;
+    padding:8px 12px 2px}
+  .glead{min-width:0; width:100%; grid-column:auto !important}
+  .division{width:88vw; flex:0 0 auto; scroll-snap-align:center}
   .ghost-col{width:60vw; flex:0 0 auto}
-  .div-head .name{min-height:0}
+  .div-head .name{min-height:0; font-size:14.5px}
   .org-evt{margin:12px 12px 0}
+  /* nagyobb érintőfelület ujjal */
+  .pencil{font-size:16px; padding:6px 8px}
+  .del{font-size:15px; padding:6px 8px}
+  .add-btn{padding:10px; font-size:13.5px}
+  .post-row{padding:9px 8px; gap:6px}
+  .post-name{font-size:13px}
+  .holder-chip{font-size:12px; padding:3px 10px 3px 3px}
+  .holder-chip .avatar{width:20px; height:20px; font-size:9px}
+  .dept-title .dname{font-size:13.5px}
+  .dept-evt{font-size:12px}
+  .div-evt .box{font-size:12.5px}
+  .post-detail{font-size:12.5px}
+  /* tömörebb fejléc */
+  .appbar{padding:8px 12px; gap:8px}
+  .appbar .t{font-size:14px}
+  .lang-btn{padding:5px 10px}
   .mnav{display:flex; position:sticky; top:0; z-index:30; background:var(--bg);
     padding:8px 12px; gap:7px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line)}
   .mnav::-webkit-scrollbar{display:none}

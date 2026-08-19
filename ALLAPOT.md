@@ -20,10 +20,13 @@ Utolsó frissítés: 2026-08-19
 - ✅ Poszt-EVT lebegő buborékban (nem ugráltatja a táblát)
 - ✅ Osztályok mozgatása ◀ ▶ nyilakkal + csoportváltás űrlapon; alosztályok ↑ ↓
 
+- ✅ GitHub: https://github.com/lori-crypto/flowersolutions-org (main → auto-deploy)
+- ✅ Vercel production él: https://flowersolutions-org-six.vercel.app
+
 ## Következik
 
-- ⏳ **Lóri teendői:** GitHub-repo + Vercel + org.flowersolutions.ro
-  (`BEALLITAS.md` 3–4. pont)
+- ⏳ **Lóri teendője:** org.flowersolutions.ro domain — Vercel „Add Custom Domain”
+  + DNS CNAME (`org` → `cname.vercel-dns.com`)
 - ⏳ Service worker (olvasó offline cache)
 - ⏳ Meghívó emailes fiók-létrehozás (Resend) — admin felület személyekhez/fiókokhoz
 - ⏳ Posztleírások modul (következő modul, a táblához kötve)
