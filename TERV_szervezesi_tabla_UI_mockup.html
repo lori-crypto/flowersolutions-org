@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Szervezési tábla — UI vázlat v3 (szerkeszthető)</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --ink:#1c2430; --muted:#66707d;
+    --line:#dfe3e8; --wire:#9aa4b1; --accent:#2f6fed; --empty:#c0392b;
+    --d7:#5b5f97; --d1:#0e7c86; --d2:#b3541e; --d3:#2e7d32;
+    --d4:#8e3b8e; --d5:#c2851a; --d6:#1565c0;
+  }
+  *{box-sizing:border-box; margin:0}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--ink); font-size:14px}
+  button{font:inherit}
+  .badge{display:inline-block; font-size:10px; font-weight:700; letter-spacing:.06em;
+    padding:2px 7px; border-radius:99px; background:#fde9c8; color:#8a5a00; vertical-align:middle}
+  .avatar{width:24px; height:24px; border-radius:50%; background:var(--accent); color:#fff;
+    display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex:0 0 auto}
+  .empty-tag{font-size:10px; font-weight:700; color:var(--empty); background:#fbeae7;
+    padding:1.5px 6px; border-radius:99px; white-space:nowrap}
+
+  /* szerkesztő vezérlők */
+  .pencil{border:none; background:none; cursor:pointer; opacity:.55; font-size:12px; padding:1px 4px; color:inherit}
+  .pencil:hover{opacity:1}
+  .del{border:none; background:none; cursor:pointer; opacity:.45; font-size:11px; padding:1px 4px; color:inherit}
+  .del:hover{opacity:1; color:var(--empty)}
+  .add-btn{width:100%; margin-top:6px; border:1.5px dashed #c6ccd4; background:none; color:var(--muted);
+    border-radius:9px; padding:6px; font-size:12px; cursor:pointer}
+  .add-btn:hover{color:var(--accent); border-color:var(--accent)}
+  body:not(.editing) .edit-only{display:none !important}
+
+  header{background:#1c2430; color:#fff; padding:10px 18px; display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+  header .t{font-size:16.5px; font-weight:700}
+  header .sp{flex:1}
+  .switch{display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; font-size:13px}
+  .switch .track{width:40px; height:22px; border-radius:99px; background:#4a5568; position:relative; transition:background .15s}
+  .switch .knob{position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s}
+  body.editing .switch .track{background:#38a169}
+  body.editing .switch .knob{left:21px}
+  .reset{border:1px solid #4a5568; background:none; color:#cbd5e0; border-radius:8px; padding:4px 10px; font-size:12px; cursor:pointer}
+  .reset:hover{color:#fff; border-color:#fff}
+  .hint{background:#e8f0fe; color:#1a4fbc; font-size:12.5px; padding:7px 18px; display:none}
+  body.editing .hint{display:block}
+
+  .sheet{padding:18px 16px 26px; overflow-x:auto}
+  .paper{min-width:1160px; max-width:1500px; margin:0 auto}
+
+  .ceo-row{display:flex; justify-content:center}
+  .ceo{background:var(--card); border:2px solid var(--ink); border-radius:12px;
+    padding:8px 22px; text-align:center; box-shadow:0 2px 6px rgba(20,30,50,.10)}
+  .ceo .role{font-size:10.5px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted)}
+  .ceo .who{font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px; justify-content:center; margin-top:2px}
+
+  .wires{position:relative; height:26px}
+  .wires div{position:absolute; background:var(--wire)}
+  .v{width:2px} .h{height:2px}
+
+  .grid7{display:grid; grid-template-columns:repeat(7,1fr); gap:10px}
+  .glead{border:1.5px solid var(--wire); background:var(--card); border-radius:10px;
+    padding:6px 14px; justify-self:center; text-align:center; min-width:190px;
+    box-shadow:0 1px 4px rgba(20,30,50,.07)}
+  .glead .role{font-size:9.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+  .glead .who{font-weight:650; font-size:13.5px; display:flex; align-items:center; gap:7px; justify-content:center}
+  .ga{grid-column:1/4} .gb{grid-column:4/8}
+
+  .division{background:var(--card); border:1px solid var(--line); border-radius:12px;
+    display:flex; flex-direction:column; overflow:hidden; box-shadow:0 1px 4px rgba(20,30,50,.07)}
+  .div-head{color:#fff; padding:8px 10px}
+  .div-head .num{font-size:9.5px; font-weight:700; opacity:.85; letter-spacing:.1em; display:flex; justify-content:space-between}
+  .div-head .name{font-size:13px; font-weight:700; line-height:1.25; min-height:33px}
+  .div-head .pencil,.div-head .del{color:#fff}
+  .div-lead{display:flex; align-items:center; gap:6px; margin-top:6px; font-size:11.5px;
+    background:rgba(255,255,255,.16); border-radius:8px; padding:4px 7px}
+  .div-lead .avatar{width:20px; height:20px; font-size:9px; background:rgba(255,255,255,.32)}
+  .div-lead .rl{opacity:.85}
+
+  .dept{border-top:2px solid var(--line); padding:7px 8px 9px}
+  .dept-title{display:flex; align-items:center; gap:6px}
+  .dept-title .dnum{font-size:9.5px; font-weight:700; color:#fff; border-radius:5px; padding:1.5px 5px}
+  .dept-title .dname{font-weight:650; font-size:12px; line-height:1.2; flex:1}
+  .dept-lead{display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); margin-top:4px}
+  .dept-lead .avatar{width:17px; height:17px; font-size:8px}
+  .dept-evt{font-size:10.5px; color:var(--muted); margin-top:4px; line-height:1.35;
+    background:#f6f7f9; border-radius:7px; padding:4px 6px}
+  .dept-evt b{font-size:9px; letter-spacing:.08em}
+
+  .post{border:1px solid var(--line); border-radius:8px; margin-top:5px; background:#fff}
+  .post-row{display:flex; align-items:center; gap:5px; padding:5px 7px; cursor:pointer}
+  .post-name{font-size:11.5px; font-weight:600; flex:1; line-height:1.25}
+  .lead-tag{font-size:8px; font-weight:700; color:#fff; background:#6b7280; border-radius:4px;
+    padding:1px 4px; margin-left:4px; vertical-align:1px; letter-spacing:.04em}
+  .holders{display:flex; flex-wrap:wrap; gap:4px; padding:0 7px 6px}
+  .holder-chip{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:600;
+    background:#eef1f5; border-radius:99px; padding:2px 8px 2px 2px; color:var(--ink)}
+  .holder-chip .avatar{width:17px; height:17px; font-size:8px}
+  .post.empty{border-style:dashed; border-color:#d9a7a0; background:#fdf7f6}
+  .post.empty .post-name{color:var(--empty)}
+  .post-detail{display:none; border-top:1px dashed var(--line); padding:6px 7px; font-size:11px;
+    color:var(--muted); line-height:1.4; background:#fafbfc; border-radius:0 0 8px 8px}
+  .post-detail b{color:var(--ink)}
+  .post-detail a{color:var(--accent); text-decoration:none; font-weight:600}
+  .post.open .post-detail{display:block}
+  @media (hover:hover){ .post:hover .post-detail{display:block} }
+
+  .div-evt{margin-top:auto; border-top:2px solid var(--line); padding:8px 9px; background:#fbfcfd}
+  .div-evt .box{border:2px solid; border-radius:9px; padding:6px 8px; font-size:11px; line-height:1.35}
+  .div-evt .box b{display:block; font-size:9px; letter-spacing:.1em; margin-bottom:2px}
+
+  .ghost-col{border:2px dashed #c6ccd4; border-radius:12px; display:flex; align-items:center;
+    justify-content:center; min-height:220px; color:var(--muted); cursor:pointer; font-size:13px; background:none}
+  .ghost-col:hover{color:var(--accent); border-color:var(--accent)}
+
+  .org-evt{margin-top:14px; border:2.5px solid var(--ink); border-radius:12px; background:var(--card);
+    padding:10px 16px; font-size:13.5px; display:flex; gap:10px; align-items:baseline;
+    box-shadow:0 2px 6px rgba(20,30,50,.10)}
+  .org-evt b{font-size:10.5px; letter-spacing:.12em; white-space:nowrap}
+
+  .legend{max-width:1000px; margin:0 auto; padding:4px 18px 24px; font-size:12.5px; color:var(--muted); line-height:1.7}
+  .legend b{color:var(--ink)}
+
+  /* modal */
+  .overlay{position:fixed; inset:0; background:rgba(15,20,30,.45); display:none;
+    align-items:center; justify-content:center; z-index:100; padding:16px}
+  .overlay.show{display:flex}
+  .modal{background:#fff; border-radius:14px; width:100%; max-width:430px; padding:18px;
+    box-shadow:0 12px 40px rgba(0,0,0,.25); max-height:90vh; overflow-y:auto}
+  .modal h3{font-size:15px; margin-bottom:12px}
+  .modal label{display:block; font-size:11.5px; font-weight:700; color:var(--muted); margin:10px 0 4px;
+    text-transform:uppercase; letter-spacing:.05em}
+  .modal input[type=text], .modal textarea{width:100%; border:1.5px solid var(--line); border-radius:9px;
+    padding:8px 10px; font:inherit; font-size:14px}
+  .modal input:focus, .modal textarea:focus{outline:none; border-color:var(--accent)}
+  .modal textarea{min-height:64px; resize:vertical}
+  .modal .chk{display:flex; align-items:center; gap:8px; margin-top:12px; font-size:13.5px}
+  .modal .btns{display:flex; gap:8px; margin-top:16px; justify-content:flex-end}
+  .modal .btns button{border-radius:9px; padding:8px 16px; cursor:pointer; font-size:13.5px}
+  .btn-cancel{border:1.5px solid var(--line); background:none; color:var(--muted)}
+  .btn-save{border:none; background:var(--accent); color:#fff; font-weight:600}
+  .fhint{font-size:11px; color:var(--muted); margin-top:3px}
+
+  nav{display:none}
+  @media (max-width:900px){
+    .sheet{padding:10px 0 18px; overflow:visible}
+    .paper{min-width:0}
+    .ceo-row{padding:0 12px}
+    .wires{display:none}
+    .grid7{display:flex; overflow-x:auto; scroll-snap-type:x mandatory; gap:12px;
+      padding:10px 12px; scrollbar-width:none}
+    .grid7::-webkit-scrollbar{display:none}
+    .glead{min-width:75vw; scroll-snap-align:center}
+    .ga,.gb{grid-column:auto}
+    .division{width:86vw; flex:0 0 auto; scroll-snap-align:center}
+    .ghost-col{width:60vw; flex:0 0 auto}
+    .div-head .name{min-height:0}
+    .org-evt{margin:12px 12px 0}
+    nav{display:flex; position:sticky; top:0; z-index:30; background:var(--bg);
+      padding:8px 12px; gap:7px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line)}
+    nav::-webkit-scrollbar{display:none}
+    nav .chip{flex:0 0 auto; border:none; cursor:pointer; font-size:12.5px; font-weight:600;
+      padding:5px 12px; border-radius:99px; color:#fff}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="t">Flower Solutions — Szervezési tábla</span>
+  <span class="badge">MINTA · v3 — SZERKESZTHETŐ PROTOTÍPUS</span>
+  <span class="sp"></span>
+  <label class="switch" id="editSwitch">
+    <span class="track"><span class="knob"></span></span>
+    <span id="switchLabel">Szerkesztő mód</span>
+  </label>
+  <button class="reset" id="resetBtn">Minta visszaállítása</button>
+</header>
+<div class="hint">✏️ Szerkesztő mód: kattints a ✎ ikonokra a nevek/EVT-k módosításához, a ＋ gombokkal bővíthetsz,
+  a ✕-szel törölhetsz. Minden változás a böngésződben tárolódik (localStorage) — ez még csak prototípus, nem az éles rendszer.</div>
+
+<nav id="nav"></nav>
+
+<div class="sheet"><div class="paper" id="paper"></div></div>
+
+<div class="legend">
+  <b>Koncepció:</b> felül az <b>ügyvezető</b>, vonalakkal a két <b>csoportvezető</b>, alattuk a 7 (bővíthető) osztály-oszlop.
+  Oszlop alján az <b>osztály EVT-doboza</b>, a tábla alján a <b>szervezet EVT-je</b>. A szaggatott piros poszt betöltetlen.
+  Posztra kattintva megjelenik a poszt EVT-je. A fejlécben kapcsolható a <b>szerkesztő mód</b> — az éles rendszerben ezt
+  jogosultság szabályozza majd (csak az ügyvezető/admin szerkeszt). <b>Minden név és EVT minta.</b>
+</div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+
+<script>
+const P = (name, holders, evt, lead=false) => ({name, holders, evt, lead});
+const DEFAULT = {
+  orgEvt:"Virágzó, önállóan működő, terjeszkedő cég, amely megbízhatóan szolgálja ki ügyfeleit",
+  ceo:"Lóri",
+  groups:[{label:"A-csoport vezető", leader:"Anna"},{label:"B-csoport vezető", leader:"Béla"}],
+  divisions:[
+  {num:"7", name:"Vezetőségi osztály", color:"var(--d7)", leader:"Anna",
+   evt:"Életképes, terjeszkedő, jól irányított szervezet", group:0,
+   depts:[
+     {num:"19", name:"Igazgatási iroda", leader:"Anna", evt:"Betartatott irányelvek, működő tervek",
+      posts:[P("Irodavezető",["Anna"],"A vezetőség döntéseinek végrehajtása és követése",true),
+             P("Jogi és megfelelőségi felelős",[],"Jogilag rendezett, védett cég")]},
+     {num:"20", name:"Ügyvezetői iroda", leader:"Lóri", evt:"Jóváhagyott célok és programok",
+      posts:[P("Ügyvezető",["Lóri"],"A cég céljainak kitűzése és elérése",true),
+             P("Asszisztens",["Kata"],"Az ügyvezető tehermentesítése")]},
+     {num:"21", name:"Külkapcsolatok", leader:"", evt:"Jó hírnév, erős partneri kapcsolatok",
+      posts:[P("Külkapcsolati felelős",[],"Ápolt partneri és hatósági kapcsolatok",true)]},
+   ]},
+  {num:"1", name:"Kommunikáció és személyzet", color:"var(--d1)", leader:"Csilla",
+   evt:"Termelékeny, etikus, jól kommunikáló szervezet", group:0,
+   depts:[
+     {num:"1", name:"Munkaerő és beléptetés", leader:"Csilla", evt:"Poszthoz rendelt, produktív munkatársak",
+      posts:[P("Személyzeti felelős",["Csilla"],"Betöltött posztok",true),
+             P("Beléptető / routing",[],"Gyorsan beilleszkedő új kolléga")]},
+     {num:"2", name:"Kommunikáció", leader:"Dani", evt:"Akadálytalan, gyors információáramlás",
+      posts:[P("Kommunikációs felelős",["Dani"],"Célba érő üzenetek",true),
+             P("Recepció / központ",["Enikő","Feri"],"Fogadott és továbbított megkeresések")]},
+     {num:"3", name:"Ellenőrzés és jelentések", leader:"", evt:"Pontos statisztikák, feltárt eltérések",
+      posts:[P("Statisztika-felelős",[],"Naprakész, hiteles mutatószámok",true)]},
+   ]},
+  {num:"2", name:"Marketing és értékesítés", color:"var(--d2)", leader:"Emese",
+   evt:"Növekvő kereslet a cég szolgáltatásai iránt", group:0,
+   depts:[
+     {num:"4", name:"Promóció", leader:"Emese", evt:"Válaszra késztető promóciós anyagok",
+      posts:[P("Marketing felelős",["Emese"],"Ismert márka, beérkező érdeklődések",true),
+             P("Grafikus / tartalom",["Gergő"],"Elkészült kampányanyagok")]},
+     {num:"5", name:"Kiadványok, webshop-felület", leader:"", evt:"Naprakész katalógus és árlisták",
+      posts:[P("Katalógus-felelős",[],"Hibátlan, friss termékadatok",true)]},
+     {num:"6", name:"Értékesítés", leader:"Huba", evt:"Leadott, visszaigazolt rendelések",
+      posts:[P("Értékesítő",["Huba","Ildi"],"Megkötött üzletek, elégedett vevők",true),
+             P("Kulcsügyfél-kapcsolattartó",[],"Megtartott, növekvő kulcsügyfelek")]},
+   ]},
+  {num:"3", name:"Pénzügy", color:"var(--d3)", leader:"Béla",
+   evt:"Fizetőképes, tartalékokkal rendelkező cég", group:1,
+   depts:[
+     {num:"7", name:"Bevételek", leader:"Judit", evt:"Beszedett követelések",
+      posts:[P("Számlázás",["Judit"],"Pontos, időben kiállított számlák",true),
+             P("Kintlévőség-kezelő",["Judit"],"Minimális lejárt kintlévőség")]},
+     {num:"8", name:"Kifizetések", leader:"", evt:"Időben, jóváhagyás után teljesített kifizetések",
+      posts:[P("Kifizetések kezelője",[],"Rendezett szállítói tartozások",true)]},
+     {num:"9", name:"Nyilvántartás és vagyon", leader:"Kinga", evt:"Pontos könyvelés, megőrzött vagyon",
+      posts:[P("Könyvelési kapcsolattartó",["Kinga"],"Egyező, zárt nyilvántartások",true),
+             P("Leltárfelelős",[],"Hiánymentes leltár")]},
+   ]},
+  {num:"4", name:"Termelés / működés", color:"var(--d4)", leader:"Márta",
+   evt:"Időben, jó minőségben teljesített rendelések", group:1,
+   depts:[
+     {num:"10", name:"Beszerzés és áruátvétel", leader:"Márta", evt:"Időben beérkezett, ellenőrzött áru",
+      posts:[P("Beszerző",["Márta"],"Jó áron, jó minőségben beszerzett áru",true),
+             P("Áruátvevő",["Nóri","Olga"],"Ellenőrzött, rögzített beérkezés")]},
+     {num:"11", name:"Raktár és készlet", leader:"", evt:"Pontos készlet, minőségét őrző áru",
+      posts:[P("Raktárvezető",[],"Rendezett raktár, pontos készlet",true),
+             P("Raktáros",["Pali"],"Gyors, hibátlan kiszedés")]},
+     {num:"12", name:"Kiszállítás", leader:"Rita", evt:"Időben, sértetlenül kézbesített rendelés",
+      posts:[P("Logisztikai szervező",["Rita"],"Optimális túrák, betartott határidők",true),
+             P("Sofőr",["Sanyi","Tibi","Ubul"],"Kézbesített áru, elégedett átvevő")]},
+   ]},
+  {num:"5", name:"Minőség és képzés", color:"var(--d5)", leader:"",
+   evt:"Egyenletesen magas minőség, képzett munkatársak", group:1,
+   depts:[
+     {num:"13", name:"Vizsgálat", leader:"", evt:"Feltárt minőségi eltérések",
+      posts:[P("Minőség-ellenőr",[],"Kiszűrt hibák még kiszállítás előtt",true)]},
+     {num:"14", name:"Korrekció", leader:"", evt:"Kijavított hibák, megszüntetett okok",
+      posts:[P("Reklamáció-kezelő",["Vera"],"Rendezett reklamációk, visszanyert bizalom",true)]},
+     {num:"15", name:"Képzés", leader:"", evt:"Posztjukat tudó, vizsgázott munkatársak",
+      posts:[P("Képzési felelős",[],"Betanított, önállóan dolgozó kollégák",true)]},
+   ]},
+  {num:"6", name:"Közönség / terjeszkedés", color:"var(--d6)", leader:"Zoli",
+   evt:"Bővülő ügyfélkör, új piacok", group:1,
+   depts:[
+     {num:"16", name:"Új ügyfelek szerzése", leader:"Zoli", evt:"Első vásárlásig eljuttatott érdeklődők",
+      posts:[P("Új-ügyfél felelős",["Zoli"],"Rendszeresen vásárló új ügyfelek",true)]},
+     {num:"17", name:"Rendezvények, bemutatók", leader:"", evt:"Sikeres bemutatók, vásárok",
+      posts:[P("Rendezvényszervező",[],"Megvalósult, eredményes események",true)]},
+     {num:"18", name:"Ügyfél-elégedettség", leader:"", evt:"Visszatérő, ajánló ügyfelek",
+      posts:[P("Elégedettség-felelős",[],"Mért és javuló elégedettség",true)]},
+   ]},
+]};
+
+const KEY = "orgboard-mock-v3";
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)) || structuredClone(DEFAULT); }
+catch(e){ S = structuredClone(DEFAULT); }
+const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ /* pl. data: URL — csak memóriában él */ } };
+
+const COLORS = ["var(--d7)","var(--d1)","var(--d2)","var(--d3)","var(--d4)","var(--d5)","var(--d6)"];
+const AV_COLORS = ["#2f6fed","#0e7c86","#b3541e","#2e7d32","#8e3b8e","#c2851a","#1565c0","#5b5f97"];
+const esc = s => String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+const initials = n => esc(n.trim().split(/\s+/).map(w=>w[0]||"").join("").slice(0,2));
+const avColor = s => AV_COLORS[(s.charCodeAt(0)||0) % AV_COLORS.length];
+const av = n => `<span class="avatar" title="${esc(n)}" style="background:${avColor(n)}">${initials(n)}</span>`;
+
+/* ── modal ─────────────────────────────────────────────────── */
+const overlay = document.getElementById("overlay");
+const modal = document.getElementById("modal");
+let onSaveCb = null;
+function openForm(title, fields, onSave){
+  onSaveCb = onSave;
+  modal.innerHTML = `<h3>${esc(title)}</h3>` + fields.map(f=>{
+    if (f.type==="textarea") return `<label>${esc(f.label)}</label><textarea id="f_${f.key}">${esc(f.value)}</textarea>` + (f.hint?`<div class="fhint">${esc(f.hint)}</div>`:"");
+    if (f.type==="checkbox") return `<div class="chk"><input type="checkbox" id="f_${f.key}" ${f.value?"checked":""}><label for="f_${f.key}" style="margin:0; text-transform:none; font-size:13.5px; color:var(--ink)">${esc(f.label)}</label></div>`;
+    return `<label>${esc(f.label)}</label><input type="text" id="f_${f.key}" value="${esc(f.value)}">` + (f.hint?`<div class="fhint">${esc(f.hint)}</div>`:"");
+  }).join("") + `<div class="btns">
+      <button class="btn-cancel" onclick="closeForm()">Mégse</button>
+      <button class="btn-save" id="saveBtn">Mentés</button></div>`;
+  document.getElementById("saveBtn").onclick = ()=>{
+    const out = {};
+    fields.forEach(f=>{
+      const el = document.getElementById("f_"+f.key);
+      out[f.key] = f.type==="checkbox" ? el.checked : el.value.trim();
+    });
+    closeForm(); onSaveCb(out); save(); render();
+  };
+  overlay.classList.add("show");
+  const first = modal.querySelector("input[type=text],textarea"); if(first) first.focus();
+}
+function closeForm(){ overlay.classList.remove("show"); }
+overlay.addEventListener("click", e=>{ if(e.target===overlay) closeForm(); });
+
+/* ── szerkesztő műveletek ──────────────────────────────────── */
+const E = {
+  ceo(){ openForm("Ügyvezető", [{key:"n",label:"Név",value:S.ceo}], o=>S.ceo=o.n); },
+  orgEvt(){ openForm("A szervezet EVT-je", [{key:"e",label:"EVT",type:"textarea",value:S.orgEvt}], o=>S.orgEvt=o.e); },
+  glead(gi){ const g=S.groups[gi];
+    openForm(g.label, [{key:"n",label:"Vezető neve (üres = betöltetlen)",value:g.leader}], o=>g.leader=o.n); },
+  div(di){ const d=S.divisions[di];
+    openForm("Osztály szerkesztése", [
+      {key:"num",label:"Sorszám / jelzés (pl. 4A)",value:d.num},
+      {key:"name",label:"Osztály neve",value:d.name},
+      {key:"leader",label:"Osztályvezető (üres = betöltetlen)",value:d.leader},
+      {key:"evt",label:"Az osztály EVT-je",type:"textarea",value:d.evt},
+    ], o=>Object.assign(d,o)); },
+  addDiv(){ openForm("Új osztály", [
+      {key:"num",label:"Sorszám / jelzés (pl. 4A vagy 8)",value:""},
+      {key:"name",label:"Osztály neve",value:""},
+      {key:"leader",label:"Osztályvezető (üres = betöltetlen)",value:""},
+      {key:"evt",label:"Az osztály EVT-je",type:"textarea",value:""},
+      {key:"grpB",label:"A B-csoporthoz tartozzon (3/4/5/6 mellé)",type:"checkbox",value:true},
+    ], o=>S.divisions.push({num:o.num||"?", name:o.name||"Új osztály", leader:o.leader, evt:o.evt,
+        color:COLORS[S.divisions.length % 7], group:o.grpB?1:0, depts:[]})); },
+  delDiv(di){ if(confirm("Biztosan törlöd ezt az osztályt az összes alosztályával együtt?")){ S.divisions.splice(di,1); save(); render(); } },
+  dept(di,pi){ const dep=S.divisions[di].depts[pi];
+    openForm("Alosztály szerkesztése", [
+      {key:"num",label:"Sorszám",value:dep.num},
+      {key:"name",label:"Alosztály neve",value:dep.name},
+      {key:"leader",label:"Alosztályvezető (üres = betöltetlen)",value:dep.leader},
+      {key:"evt",label:"Az alosztály EVT-je",type:"textarea",value:dep.evt},
+    ], o=>Object.assign(dep,o)); },
+  addDept(di){ openForm("Új alosztály", [
+      {key:"num",label:"Sorszám",value:""},
+      {key:"name",label:"Alosztály neve",value:""},
+      {key:"leader",label:"Alosztályvezető (üres = betöltetlen)",value:""},
+      {key:"evt",label:"Az alosztály EVT-je",type:"textarea",value:""},
+    ], o=>S.divisions[di].depts.push({num:o.num||"?", name:o.name||"Új alosztály", leader:o.leader, evt:o.evt, posts:[]})); },
+  delDept(di,pi){ if(confirm("Törlöd az alosztályt a posztjaival együtt?")){ S.divisions[di].depts.splice(pi,1); save(); render(); } },
+  post(di,pi,qi){ const p=S.divisions[di].depts[pi].posts[qi];
+    openForm("Poszt szerkesztése", [
+      {key:"name",label:"Poszt neve",value:p.name},
+      {key:"holders",label:"Betöltő személyek",value:p.holders.join(", "),hint:"Több név vesszővel elválasztva. Üresen hagyva: betöltetlen."},
+      {key:"evt",label:"A poszt EVT-je",type:"textarea",value:p.evt},
+      {key:"lead",label:"Ez a poszt vezetői poszt",type:"checkbox",value:p.lead},
+    ], o=>{ p.name=o.name||p.name; p.evt=o.evt; p.lead=o.lead;
+            p.holders=o.holders? o.holders.split(",").map(s=>s.trim()).filter(Boolean) : []; }); },
+  addPost(di,pi){ openForm("Új poszt", [
+      {key:"name",label:"Poszt neve",value:""},
+      {key:"holders",label:"Betöltő személyek",value:"",hint:"Több név vesszővel. Üresen hagyva: betöltetlen."},
+      {key:"evt",label:"A poszt EVT-je",type:"textarea",value:""},
+      {key:"lead",label:"Vezetői poszt",type:"checkbox",value:false},
+    ], o=>S.divisions[di].depts[pi].posts.push({name:o.name||"Új poszt", evt:o.evt, lead:o.lead,
+        holders:o.holders? o.holders.split(",").map(s=>s.trim()).filter(Boolean) : []})); },
+  delPost(di,pi,qi){ if(confirm("Törlöd a posztot?")){ S.divisions[di].depts[pi].posts.splice(qi,1); save(); render(); } },
+};
+window.E = E; window.closeForm = closeForm;
+
+/* ── renderelés ────────────────────────────────────────────── */
+function render(){
+  const paper = document.getElementById("paper");
+  const nav = document.getElementById("nav");
+  const gA = S.divisions.filter(d=>d.group===0).length;
+  const gB = S.divisions.length - gA;
+  const N = Math.max(S.divisions.length + (document.body.classList.contains("editing")?1:0), 1);
+  const cx = i => ((i+0.5)/N*100).toFixed(3)+"%";
+  const centerOf = idxs => ((idxs.reduce((a,b)=>a+b,0)/idxs.length + 0.5)/N*100).toFixed(3)+"%";
+  const idxA = S.divisions.map((d,i)=>d.group===0?i:null).filter(v=>v!==null);
+  const idxB = S.divisions.map((d,i)=>d.group===1?i:null).filter(v=>v!==null);
+  const cA = idxA.length? centerOf(idxA) : "25%";
+  const cB = idxB.length? centerOf(idxB) : "75%";
+
+  const wires1 = `
+    <div class="v" style="left:50%; top:0; height:12px"></div>
+    <div class="h" style="left:min(${cA},50%); top:12px; width:calc(max(${cB},50%) - min(${cA},50%))"></div>
+    <div class="v" style="left:${cA}; top:12px; height:14px"></div>
+    <div class="v" style="left:${cB}; top:12px; height:14px"></div>`;
+  const bracket = idxs => idxs.length? `
+    <div class="h" style="left:${cx(idxs[0])}; top:10px; width:calc(${cx(idxs[idxs.length-1])} - ${cx(idxs[0])})"></div>
+    ${idxs.map(i=>`<div class="v" style="left:${cx(i)}; top:10px; height:14px"></div>`).join("")}` : "";
+  const wires2 = `
+    ${idxA.length?`<div class="v" style="left:${cA}; top:0; height:10px"></div>`:""}${bracket(idxA)}
+    ${idxB.length?`<div class="v" style="left:${cB}; top:0; height:10px"></div>`:""}${bracket(idxB)}`;
+
+  const gridStyle = `grid-template-columns:repeat(${N},1fr)`;
+  const gaSpan = `grid-column:1/${gA+1}`, gbSpan = `grid-column:${gA+1}/${gA+gB+1}`;
+
+  paper.innerHTML = `
+    <div class="ceo-row"><div class="ceo">
+      <div class="role">Ügyvezető</div>
+      <div class="who">${av(S.ceo)} ${esc(S.ceo)} <button class="pencil edit-only" onclick="E.ceo()">✎</button></div>
+    </div></div>
+    <div class="wires">${wires1}</div>
+    <div class="grid7" style="${gridStyle}">
+      <div class="glead" style="${gaSpan}">
+        <div class="role">${esc(S.groups[0].label)} · ${S.divisions.filter(d=>d.group===0).map(d=>esc(d.num)).join(" / ")||"—"}</div>
+        <div class="who">${S.groups[0].leader? av(S.groups[0].leader)+" "+esc(S.groups[0].leader) : '<span class="empty-tag">betöltetlen</span>'}
+          <button class="pencil edit-only" onclick="E.glead(0)">✎</button></div>
+      </div>
+      <div class="glead" style="${gbSpan}">
+        <div class="role">${esc(S.groups[1].label)} · ${S.divisions.filter(d=>d.group===1).map(d=>esc(d.num)).join(" / ")||"—"}</div>
+        <div class="who">${S.groups[1].leader? av(S.groups[1].leader)+" "+esc(S.groups[1].leader) : '<span class="empty-tag">betöltetlen</span>'}
+          <button class="pencil edit-only" onclick="E.glead(1)">✎</button></div>
+      </div>
+    </div>
+    <div class="wires" style="height:24px">${wires2}</div>
+    <div class="grid7" style="${gridStyle}" id="board">
+      ${S.divisions.map((d,di)=>`
+        <div class="division" id="div-${di}">
+          <div class="div-head" style="background:${d.color}">
+            <div class="num"><span>${esc(d.num)}. OSZTÁLY</span>
+              <span><button class="pencil edit-only" onclick="E.div(${di})">✎</button><button class="del edit-only" onclick="E.delDiv(${di})">✕</button></span></div>
+            <div class="name">${esc(d.name)}</div>
+            <div class="div-lead">${d.leader
+              ? `${av(d.leader)} <b>${esc(d.leader)}</b> <span class="rl">— osztályvezető</span>`
+              : `<span class="empty-tag">betöltetlen</span> <span class="rl">osztályvezető</span>`}</div>
+          </div>
+          ${d.depts.map((dep,pi)=>`
+            <div class="dept">
+              <div class="dept-title">
+                <span class="dnum" style="background:${d.color}">${esc(dep.num)}</span>
+                <span class="dname">${esc(dep.name)}</span>
+                <button class="pencil edit-only" onclick="E.dept(${di},${pi})">✎</button>
+                <button class="del edit-only" onclick="E.delDept(${di},${pi})">✕</button>
+              </div>
+              <div class="dept-lead">${dep.leader
+                ? `${av(dep.leader)} ${esc(dep.leader)} — alosztályvezető`
+                : `<span class="empty-tag">betöltetlen</span> alosztályvezető`}</div>
+              ${dep.posts.map((p,qi)=>`
+                <div class="post ${p.holders.length?"":"empty"}" onclick="this.classList.toggle('open')">
+                  <div class="post-row">
+                    <span class="post-name">${esc(p.name)}${p.lead?`<span class="lead-tag" style="background:${d.color}">VEZ</span>`:""}</span>
+                    ${p.holders.length ? "" : `<span class="empty-tag">betöltetlen</span>`}
+                    <button class="pencil edit-only" onclick="event.stopPropagation();E.post(${di},${pi},${qi})">✎</button>
+                    <button class="del edit-only" onclick="event.stopPropagation();E.delPost(${di},${pi},${qi})">✕</button>
+                  </div>
+                  ${p.holders.length ? `<div class="holders">${p.holders.map(h=>
+                    `<span class="holder-chip">${av(h)} ${esc(h)}</span>`).join("")}</div>` : ""}
+                  <div class="post-detail">
+                    <b>Poszt EVT:</b> ${esc(p.evt)||"—"}<br>
+                    <a href="#" onclick="event.stopPropagation();return false">Posztleírás →</a>
+                  </div>
+                </div>`).join("")}
+              <button class="add-btn edit-only" onclick="E.addPost(${di},${pi})">＋ Poszt</button>
+              <div class="dept-evt"><b>EVT</b> · ${esc(dep.evt)||"—"}</div>
+            </div>`).join("")}
+          <div class="dept edit-only" style="border-top:none; padding-top:0">
+            <button class="add-btn" onclick="E.addDept(${di})">＋ Alosztály</button>
+          </div>
+          <div class="div-evt">
+            <div class="box" style="border-color:${d.color}">
+              <b style="color:${d.color}">AZ OSZTÁLY EVT-je</b>
+              ${esc(d.evt)||"—"} <button class="pencil edit-only" onclick="E.div(${di})">✎</button>
+            </div>
+          </div>
+        </div>`).join("")}
+      <button class="ghost-col edit-only" onclick="E.addDiv()">＋ Új osztály<br>(pl. 4A / 4B bontás)</button>
+    </div>
+    <div class="org-evt">
+      <b>A SZERVEZET EVT-je</b>
+      <span>${esc(S.orgEvt)} <button class="pencil edit-only" onclick="E.orgEvt()">✎</button></span>
+    </div>`;
+
+  nav.innerHTML = "";
+  S.divisions.forEach((d,di)=>{
+    const chip = document.createElement("button");
+    chip.className="chip"; chip.style.background=d.color;
+    chip.textContent = d.num + " · " + d.name.split(" ")[0];
+    chip.onclick = ()=>document.getElementById("div-"+di).scrollIntoView({behavior:"smooth", inline:"center", block:"nearest"});
+    nav.appendChild(chip);
+  });
+}
+
+document.getElementById("editSwitch").addEventListener("click", e=>{
+  e.preventDefault();
+  document.body.classList.toggle("editing");
+  document.getElementById("switchLabel").textContent =
+    document.body.classList.contains("editing") ? "Szerkesztő mód: BE" : "Szerkesztő mód";
+  render();
+});
+document.getElementById("resetBtn").addEventListener("click", ()=>{
+  if(confirm("Visszaállítod az eredeti minta-adatokat? A módosításaid elvesznek.")){
+    S = structuredClone(DEFAULT); save(); render();
+  }
+});
+render();
+</script>
+</body>
+</html>

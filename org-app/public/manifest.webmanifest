@@ -1,0 +1,12 @@
+{
+  "name": "FS Org — Flower Solutions",
+  "short_name": "FS Org",
+  "description": "Flower Solutions cégirányítási rendszer",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f5f7",
+  "theme_color": "#1c2430",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

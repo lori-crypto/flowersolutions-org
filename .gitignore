@@ -1,0 +1,14 @@
+# függőségek és build
+node_modules/
+.next/
+out/
+
+# titkok — SOHA nem kerülhetnek a repóba
+.env
+.env.local
+.env*.local
+
+# egyéb
+.DS_Store
+*.log
+.vercel
