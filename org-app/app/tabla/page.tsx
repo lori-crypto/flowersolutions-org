@@ -47,6 +47,17 @@ export default function TablaPage() {
     return () => { document.body.classList.remove("editing"); };
   }, [editing, canEdit]);
 
+  // PWA: előtérbe kerüléskor automatikus adat-frissítés
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") reload(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [reload]);
+
   async function signOut() { await supabase.auth.signOut(); }
 
   // ── űrlap-nyitók ────────────────────────────────────────────
@@ -210,6 +221,8 @@ export default function TablaPage() {
       <header className="appbar">
         <span className="t">{board.org.name} — {t("org_board")}</span>
         <span className="sp" />
+        <button className="lang-btn" title="Frissítés / Reîmprospătare"
+                onClick={() => reload()}>↻</button>
         <select className="lang-select" value={lang}
                 onChange={e => setLang(e.target.value as "hu" | "ro")} aria-label="Nyelv / Limba">
           <option value="hu">HU — magyar</option>
