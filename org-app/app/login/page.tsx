@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
@@ -7,6 +7,14 @@ import { useI18n } from "@/lib/i18n";
 export default function LoginPage() {
   const { t } = useI18n();
   const router = useRouter();
+
+  // Ha már be vagy jelentkezve (pl. vissza-gesztussal kerültél ide),
+  // azonnal visszairányítunk a táblára.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace("/tabla");
+    });
+  }, [router]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -19,7 +27,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) { setErr(t("login_error")); return; }
-    router.push("/tabla");
+    router.replace("/tabla");
   }
 
   async function forgot() {

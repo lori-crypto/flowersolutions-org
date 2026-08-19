@@ -22,6 +22,9 @@ Utolsó frissítés: 2026-08-19
 
 - ✅ GitHub: https://github.com/lori-crypto/flowersolutions-org (main → auto-deploy)
 - ✅ Vercel production él: https://flowersolutions-org-six.vercel.app
+- ✅ Mobil UI csiszolás (telefonon jóváhagyva): A/B csoport egy sorban fele-fele,
+  osztályválasztó csík ki, nyelvválasztó legördülő, nagy érintőfelületek
+- ✅ ↻ frissítés gomb + automatikus adat-újratöltés előtérbe kerüléskor (PWA)
 
 ## Következik
 

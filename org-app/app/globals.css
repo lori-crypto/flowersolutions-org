@@ -3,7 +3,7 @@
   --line:#dfe3e8; --wire:#9aa4b1; --accent:#2f6fed; --empty:#c0392b;
 }
 *{box-sizing:border-box; margin:0}
-html,body{height:100%}
+html,body{height:100%; overscroll-behavior-x:none} /* vízszintes húzás ne indítson vissza-navigációt */
 body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--ink); font-size:14px}
 button{font:inherit}
 a{color:var(--accent)}
