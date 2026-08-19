@@ -86,10 +86,11 @@ body.editing .hint{display:block}
   display:flex; flex-direction:column; box-shadow:0 1px 4px rgba(20,30,50,.07)}
 .div-head{color:#fff; padding:8px 10px; border-radius:11px 11px 0 0}
 .div-head .num{font-size:9.5px; font-weight:700; opacity:.85; letter-spacing:.1em; display:flex; justify-content:space-between}
-.div-head .name{font-size:13px; font-weight:700; line-height:1.25; min-height:33px}
+.div-head .name{font-size:13px; font-weight:700; line-height:1.25; min-height:33px; text-align:center}
 .div-head .pencil,.div-head .del{color:#fff}
-.div-lead{display:flex; align-items:center; gap:6px; margin-top:6px; font-size:11.5px;
-  background:rgba(255,255,255,.16); border-radius:8px; padding:4px 7px; flex-wrap:wrap}
+.div-lead{display:flex; align-items:center; justify-content:center; gap:6px; margin-top:6px;
+  font-size:11.5px; background:rgba(255,255,255,.16); border-radius:8px; padding:4px 7px;
+  flex-wrap:wrap; text-align:center}
 .div-lead .avatar{width:20px; height:20px; font-size:9px; background:rgba(255,255,255,.32)}
 .div-lead .rl{opacity:.85}
 .div-lead .pencil{color:#fff}
