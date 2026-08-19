@@ -222,7 +222,7 @@ export default function TablaPage() {
         <span className="t">{board.org.name} — {t("org_board")}</span>
         <span className="sp" />
         <button className="lang-btn" title="Frissítés / Reîmprospătare"
-                onClick={() => reload()}>↻</button>
+                onClick={() => window.location.reload()}>↻</button>
         <select className="lang-select" value={lang}
                 onChange={e => setLang(e.target.value as "hu" | "ro")} aria-label="Nyelv / Limba">
           <option value="hu">HU — magyar</option>
