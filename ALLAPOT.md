@@ -37,7 +37,9 @@ Utolsó frissítés: 2026-08-19
   + DNS CNAME (`org` → `cname.vercel-dns.com`)
 - ⏳ Service worker (olvasó offline cache)
 - ⏳ Meghívó emailes fiók-létrehozás (Resend) — admin felület személyekhez/fiókokhoz
-- ⏳ Posztleírások modul (következő modul, a táblához kötve)
+- ⏳ Posztleírások modul — **követelmények és terv kész**
+  (`MODUL_02_posztleirasok_KOVETELMENYEK.md`), 4 nyitott kérdés vár válaszra;
+  utána jöhet az 1. ütem építése
 - ⏳ Változásnapló nézet + visszavonás admin felületen (a napló már gyűlik)
 
 ## Későbbi modulok

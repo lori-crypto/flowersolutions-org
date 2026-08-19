@@ -11,6 +11,8 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   signing_in:       { hu: "Belépés…", ro: "Se autentifică…" },
   login_error:      { hu: "Hibás email vagy jelszó.", ro: "Email sau parolă greșită." },
   forgot:           { hu: "Elfelejtett jelszó", ro: "Am uitat parola" },
+  remember_me:      { hu: "Maradjak bejelentkezve", ro: "Ține-mă autentificat" },
+  show_pw:          { hu: "Jelszó megjelenítése", ro: "Afișează parola" },
   reset_sent:       { hu: "Ha létezik a fiók, elküldtük a visszaállító emailt.", ro: "Dacă contul există, am trimis emailul de resetare." },
   sign_out:         { hu: "Kijelentkezés", ro: "Deconectare" },
   loading:          { hu: "Betöltés…", ro: "Se încarcă…" },

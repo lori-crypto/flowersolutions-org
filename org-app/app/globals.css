@@ -58,6 +58,15 @@ body.editing .hint{display:block}
 .login-card .ok{color:#2e7d32; font-size:12.5px; margin-top:10px}
 .login-card .forgot{display:block; margin-top:12px; font-size:12.5px; text-align:center;
   background:none; border:none; color:var(--accent); cursor:pointer; width:100%}
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:42px}
+.pw-eye{position:absolute; right:4px; top:50%; transform:translateY(-50%);
+  border:none; background:none; cursor:pointer; font-size:16px; padding:6px 8px; opacity:.65}
+.pw-eye:hover{opacity:1}
+.remember-row{display:flex !important; align-items:center; gap:8px; margin-top:14px !important;
+  font-size:13px !important; font-weight:500 !important; color:var(--ink) !important;
+  text-transform:none !important; letter-spacing:0 !important; cursor:pointer}
+.remember-row input{width:auto; accent-color:var(--accent)}
 
 /* ── tábla ────────────────────────────────────────────────── */
 .sheet{padding:18px 20px 26px; overflow-x:auto}

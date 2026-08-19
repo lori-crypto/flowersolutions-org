@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, REMEMBER_KEY } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 
 export default function LoginPage() {
@@ -17,6 +17,8 @@ export default function LoginPage() {
   }, [router]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
@@ -24,6 +26,7 @@ export default function LoginPage() {
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(""); setOk("");
+    try { localStorage.setItem(REMEMBER_KEY, remember ? "1" : "0"); } catch {}
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) { setErr(t("login_error")); return; }
@@ -46,8 +49,20 @@ export default function LoginPage() {
         <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                autoComplete="email" required />
         <label>{t("password")}</label>
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-               autoComplete="current-password" required />
+        <div className="pw-wrap">
+          <input type={showPw ? "text" : "password"} value={password}
+                 onChange={e => setPassword(e.target.value)}
+                 autoComplete="current-password" required />
+          <button type="button" className="pw-eye" aria-label={t("show_pw")}
+                  title={t("show_pw")} onClick={() => setShowPw(v => !v)}>
+            {showPw ? "🙈" : "👁"}
+          </button>
+        </div>
+        <label className="remember-row">
+          <input type="checkbox" checked={remember}
+                 onChange={e => setRemember(e.target.checked)} />
+          {t("remember_me")}
+        </label>
         <button className="btn" type="submit" disabled={busy}>
           {busy ? t("signing_in") : t("sign_in")}
         </button>
