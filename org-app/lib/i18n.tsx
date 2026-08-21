@@ -97,6 +97,13 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   holidays_admin:   { hu: "Ünnepnapok", ro: "Sărbători legale" },
   gen_holidays:     { hu: "Ünnepnapok feltöltése erre az évre", ro: "Completează sărbătorile pentru acest an" },
   gen_holidays_hint:{ hu: "Fix ünnepek + ortodox és katolikus húsvét/pünkösd automatikusan kiszámolva. A meglévőket nem írja felül.", ro: "Sărbători fixe + Paștele/Rusaliile ortodoxe și catolice, calculate automat. Cele existente rămân." },
+  duty_repeat_title:{ hu: "Hétvégi ügyelet ismétlése", ro: "Repetarea serviciului de weekend" },
+  duty_repeat_btn:  { hu: "A beírt minta ismétlése az év végéig", ro: "Repetă modelul până la sfârșitul anului" },
+  duty_repeat_hint: { hu: "Írd be az első hétvégé(ke)t ügyeletként (akár 2-2 kollégával), majd ez a gomb a váltakozó mintát végigmásolja az év üres hétvégéire. Akinek az adott napon már van bejegyzése (pl. szabadság), azt kihagyja.", ro: "Completează primele weekenduri (chiar 2-2 colegi), apoi butonul copiază modelul alternant pe weekendurile libere ale anului. Zilele cu înregistrări existente (ex. concediu) sunt sărite." },
+  duty_repeat_confirm:{ hu: "A beírt hétvégi minta ismétlése az üres hétvégékre?", ro: "Repeți modelul pe weekendurile libere?" },
+  duty_repeat_done: { hu: "Ügyelet-másolás kész", ro: "Copierea s-a terminat" },
+  duty_no_pattern:  { hu: "Előbb írj be legalább egy hétvégi ügyeletet mintának.", ro: "Mai întâi completează cel puțin un weekend ca model." },
+  duty_no_targets:  { hu: "Nincs üres hétvége a minta után.", ro: "Nu există weekenduri libere după model." },
 };
 
 type I18n = {

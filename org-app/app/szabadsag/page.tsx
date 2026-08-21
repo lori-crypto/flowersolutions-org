@@ -145,6 +145,43 @@ export default function SzabadsagPage() {
     await reloadYear();
   }
 
+  /** A beírt hétvégi ügyelet-mintát végigmásolja az év üres hétvégéire. */
+  async function repeatDuty() {
+    if (!data || !st) return;
+    const duty = data.entries.filter(e => e.type_code === "ugyelet");
+    const weekends: { sat: string; sun: string | null }[] = [];
+    const d = new Date(year, 0, 1);
+    while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+    while (d.getFullYear() === year) {
+      const sun = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+      weekends.push({ sat: iso(d), sun: sun.getFullYear() === year ? iso(sun) : null });
+      d.setDate(d.getDate() + 7);
+    }
+    const byWeekend = weekends.map(w => duty.filter(e => e.day === w.sat || e.day === w.sun));
+    const srcIdx = byWeekend.map((l, i) => (l.length ? i : -1)).filter(i => i >= 0);
+    if (!srcIdx.length) { alert(t("duty_no_pattern")); return; }
+    const lastSrc = srcIdx[srcIdx.length - 1];
+    const pattern = srcIdx.map(i => ({ w: weekends[i], list: byWeekend[i] }));
+    const targets = weekends
+      .map((w, i) => ({ w, i }))
+      .filter(({ i }) => i > lastSrc && byWeekend[i].length === 0);
+    if (!targets.length) { alert(t("duty_no_targets")); return; }
+    if (!confirm(`${t("duty_repeat_confirm")} (${pattern.length} → ${targets.length})`)) return;
+    let ok = 0, skip = 0;
+    for (let k = 0; k < targets.length; k++) {
+      const src = pattern[k % pattern.length];
+      const tgt = targets[k].w;
+      for (const e of src.list) {
+        const day = e.day === src.w.sat ? tgt.sat : tgt.sun;
+        if (!day) { skip++; continue; }
+        try { await addLeave(boardId, e.person_id, [day], e.part, "ugyelet", ""); ok++; }
+        catch { skip++; }
+      }
+    }
+    await reloadYear();
+    alert(`${t("duty_repeat_done")}: ${ok} ✓${skip ? `, ${skip} ✕` : ""}`);
+  }
+
   async function removeEntry(e: LeaveEntry) {
     if (!confirm(t("confirm_del_entry"))) return;
     try { await deleteLeave(e.id); await reloadYear(); }
@@ -349,6 +386,7 @@ export default function SzabadsagPage() {
           {showAdmin && board && (
             <AdminPanel st={st} boardId={boardId} year={year} lim={lim}
                         blackouts={data.blackouts} quotas={quotasAll}
+                        onRepeatDuty={repeatDuty}
                         onChanged={async () => {
                           const s = await loadLeaveStatic(); setSt(s);
                           await reloadYear(boardId, year, s.me?.id ?? null);
@@ -497,10 +535,11 @@ function AddModal({ st, defaults, onClose, onSave }: {
 }
 
 // ── HR beállító panel ────────────────────────────────────────
-function AdminPanel({ st, boardId, year, lim, blackouts, quotas, onChanged }: {
+function AdminPanel({ st, boardId, year, lim, blackouts, quotas, onChanged, onRepeatDuty }: {
   st: LeaveStatic; boardId: string; year: number; lim: number;
   blackouts: Blackout[]; quotas: Quota[];
   onChanged: () => Promise<void>;
+  onRepeatDuty: () => Promise<void>;
 }) {
   const { t } = useI18n();
   const [limVal, setLimVal] = useState(String(lim));
@@ -574,6 +613,11 @@ function AdminPanel({ st, boardId, year, lim, blackouts, quotas, onChanged }: {
             }}>{t("cancel")}</button>
           )}
         </div>
+      </section>
+      <section>
+        <h4>{t("duty_repeat_title")} · {year}</h4>
+        <button className="mini-btn" onClick={onRepeatDuty}>{t("duty_repeat_btn")}</button>
+        <div className="fhint" style={{ marginTop: 4 }}>{t("duty_repeat_hint")}</div>
       </section>
       <section>
         <h4>{t("holidays_admin")} · {year}</h4>
