@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -220,6 +221,10 @@ export default function TablaPage() {
     <>
       <header className="appbar">
         <span className="t">{board.org.name} — {t("org_board")}</span>
+        <nav className="topnav">
+          <Link href="/tabla" className="active">{t("nav_tabla")}</Link>
+          <Link href="/szabadsag">{t("nav_leave")}</Link>
+        </nav>
         <span className="sp" />
         <button className="lang-btn" title="Frissítés / Reîmprospătare"
                 onClick={() => window.location.reload()}>↻</button>

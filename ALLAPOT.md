@@ -42,6 +42,9 @@ Utolsó frissítés: 2026-08-19
   utána jöhet az 1. ütem építése
 - ⏳ Változásnapló nézet + visszavonás admin felületen (a napló már gyűlik)
 
+- ⏳ Szabadságos tábla modul — **követelmények és terv kész**
+  (`MODUL_03_szabadsag_KOVETELMENYEK.md`), 5 nyitott kérdés; indulás 2027-től
+
 ## Későbbi modulok
 
 Pénzügy (NEXUS-szinkron), Projekt, HR, Irányelvek — lásd `TECHNIKAI_TERV.md`.
