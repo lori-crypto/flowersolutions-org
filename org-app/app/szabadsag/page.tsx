@@ -33,6 +33,7 @@ export default function SzabadsagPage() {
     quota: Quota | null; myEntries: LeaveEntry[];
   } | null>(null);
   const [showAdd, setShowAdd] = useState<null | { from: string; to: string }>(null);
+  const [dayModal, setDayModal] = useState<string | null>(null);
   const [showAdmin, setShowAdmin] = useState(false);
   const [quotasAll, setQuotasAll] = useState<Quota[]>([]);
   const [err, setErr] = useState("");
@@ -215,7 +216,7 @@ export default function SzabadsagPage() {
             const es = entriesByDay.get(day) ?? [];
             const full = dayFull(day);
             return (
-              <div key={day}
+              <div key={day} onClick={() => setDayModal(day)}
                    className={"dayrow" + (weekend ? " weekend" : "") + (blocked ? " blocked" : "")}>
                 <div className="daycol">
                   <b>{i + 1}</b>
@@ -236,7 +237,8 @@ export default function SzabadsagPage() {
                         {e.person?.name ?? "?"}
                         {e.part !== "egesz" && <em>½{e.part === "de" ? "DE" : "DU"}</em>}
                         {(st.isHr || e.person_id === st.me?.id) && day >= iso(new Date()) && (
-                          <button className="chip-del" onClick={() => removeEntry(e)}>✕</button>
+                          <button className="chip-del"
+                                  onClick={ev => { ev.stopPropagation(); removeEntry(e); }}>✕</button>
                         )}
                       </span>
                     );
@@ -244,7 +246,7 @@ export default function SzabadsagPage() {
                   {full && !blocked && <span className="full-tag">{t("full")} ({lim})</span>}
                 </div>
                 <button className="day-add" disabled={!canWriteDay(day)}
-                        onClick={() => setShowAdd({ from: day, to: day })}>＋</button>
+                        onClick={ev => { ev.stopPropagation(); setShowAdd({ from: day, to: day }); }}>＋</button>
               </div>
             );
           })}
@@ -288,7 +290,7 @@ export default function SzabadsagPage() {
                     }),
                   ].filter(Boolean).join("\n");
                   return (
-                    <div key={r} title={tip}
+                    <div key={r} title={tip} onClick={() => setDayModal(day)}
                          className={"wcell" + (we ? " wwe" : "") +
                            (hol ? " whol" : "") + (blocked ? " wblocked" : "")}>
                       <span className="wnum">{dnum}</span>
@@ -365,6 +367,51 @@ export default function SzabadsagPage() {
         <AddModal st={st} defaults={showAdd} onClose={() => setShowAdd(null)}
                   onSave={submitAdd} />
       )}
+
+      {dayModal && (() => {
+        const day = dayModal;
+        const es = entriesByDay.get(day) ?? [];
+        const hol = holidayMap.get(day);
+        const blocked = blockedDays.has(day);
+        const reason = blockedDays.get(day);
+        const d = new Date(day + "T00:00:00");
+        return (
+          <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setDayModal(null); }}>
+            <div className="modal">
+              <h3 style={{ textTransform: "capitalize" }}>
+                {d.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
+              </h3>
+              {hol && <div className="holiday-tag" style={{ display: "inline-block", marginBottom: 8 }}>
+                ★ {pick(hol.name_hu, hol.name_ro)}</div>}
+              {blocked && <div className="blocked-banner">
+                {t("blocked")}{reason ? " · " + reason : ""}</div>}
+              {es.length === 0 && <div className="muted" style={{ margin: "8px 0" }}>{t("no_entries")}</div>}
+              {es.map(e => {
+                const ty = typeMap.get(e.type_code);
+                return (
+                  <div className="my-row" key={e.id}>
+                    <span className="dot" style={{ background: ty?.color }} />
+                    <b>{e.person?.name ?? "?"}</b>
+                    <span>{e.part === "egesz" ? "" : e.part === "de" ? "½ DE" : "½ DU"}</span>
+                    <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)}</span>
+                    {e.note && <span className="muted">„{e.note}”</span>}
+                    {(st.isHr || (e.person_id === st.me?.id && day >= iso(new Date()))) && (
+                      <button className="del" onClick={() => removeEntry(e)}>✕</button>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="btns">
+                <button className="btn-cancel" onClick={() => setDayModal(null)}>{t("close")}</button>
+                <button className="btn-save" disabled={!canWriteDay(day)}
+                        onClick={() => { setDayModal(null); setShowAdd({ from: day, to: day }); }}>
+                  ＋ {t("add_leave")}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

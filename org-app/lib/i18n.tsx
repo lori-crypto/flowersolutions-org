@@ -93,6 +93,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   reason:           { hu: "Indoklás", ro: "Motiv" },
   add:              { hu: "Hozzáadás", ro: "Adaugă" },
   quotas:           { hu: "Éves keretek", ro: "Zile alocate" },
+  close:            { hu: "Bezárás", ro: "Închide" },
 };
 
 type I18n = {
