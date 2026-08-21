@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { shortName } from "@/lib/names";
 import {
   LeaveStatic, LeaveEntry, Blackout, Holiday, Quota, Part,
   loadLeaveStatic, loadLeaveYear, addLeave, deleteLeave,
@@ -278,8 +279,8 @@ export default function SzabadsagPage() {
                     const ty = typeMap.get(e.type_code);
                     return (
                       <span key={e.id} className="entry-chip" style={{ background: ty?.color }}
-                            title={pick(ty?.name_hu ?? "", ty?.name_ro) + (e.note ? " — " + e.note : "")}>
-                        {e.person?.name ?? "?"}
+                            title={(e.person?.name ?? "?") + " · " + pick(ty?.name_hu ?? "", ty?.name_ro) + (e.note ? " — " + e.note : "")}>
+                        {shortName(e.person?.name ?? "?")}
                         {e.part !== "egesz" && <em>½{e.part === "de" ? "DE" : "DU"}</em>}
                         {(st.isHr || e.person_id === st.me?.id) && day >= iso(new Date()) && (
                           <button className="chip-del"
@@ -336,7 +337,7 @@ export default function SzabadsagPage() {
                         {hol && <span className="wstar">★</span>}
                         {es.slice(0, 4).map(e => (
                           <i key={e.id} style={{ background: typeMap.get(e.type_code)?.color }}>
-                            {initialsOf(e.person?.name ?? "?")}
+                            {shortName(e.person?.name ?? "?")}
                           </i>
                         ))}
                         {es.length > 4 && <span className="wmore">+{es.length - 4}</span>}
