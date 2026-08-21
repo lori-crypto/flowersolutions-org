@@ -233,6 +233,7 @@ export default function TablaPage() {
         <nav className="topnav">
           <Link href="/tabla" className="active">{t("nav_tabla")}</Link>
           <Link href="/szabadsag">{t("nav_leave")}</Link>
+          <Link href="/kollegak">{t("nav_people")}</Link>
         </nav>
         <span className="sp" />
         <button className="lang-btn" title="Frissítés / Reîmprospătare"

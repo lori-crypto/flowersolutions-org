@@ -105,6 +105,22 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   duty_no_pattern:  { hu: "Előbb írj be legalább egy hétvégi ügyeletet mintának.", ro: "Mai întâi completează cel puțin un weekend ca model." },
   duty_no_targets:  { hu: "Nincs üres hétvége a minta után.", ro: "Nu există weekenduri libere după model." },
   add_duty:         { hu: "Ügyelet", ro: "Serviciu" },
+  nav_people:       { hu: "Kollégák", ro: "Colegi" },
+  people_title:     { hu: "Kollégák", ro: "Colegi" },
+  p_add:            { hu: "＋ Kolléga felvétele", ro: "＋ Adaugă coleg" },
+  p_edit:           { hu: "Kolléga szerkesztése", ro: "Editare coleg" },
+  p_name:           { hu: "Név", ro: "Nume" },
+  p_email:          { hu: "Email (a belépéshez majd ez kell)", ro: "Email (necesar pentru autentificare)" },
+  p_phone:          { hu: "Telefon", ro: "Telefon" },
+  p_lang:           { hu: "Nyelv", ro: "Limba" },
+  p_account:        { hu: "van fiókja", ro: "are cont" },
+  p_no_account:     { hu: "nincs még fiókja", ro: "fără cont încă" },
+  p_active:         { hu: "aktív", ro: "activ" },
+  p_inactive:       { hu: "inaktív", ro: "inactiv" },
+  p_deact:          { hu: "Inaktiválás", ro: "Dezactivare" },
+  p_react:          { hu: "Visszaaktiválás", ro: "Reactivare" },
+  p_boards:         { hu: "Szabadság-táblák", ro: "Planificatoare" },
+  p_hint:           { hu: "A kolléga felvétele után azonnal szerepel a szervezési táblán kiosztható személyek és a szabadság-táblák között. Belépési fiókot később kap: azt egyelőre a Supabase-ben hozzuk létre az email-címével (a meghívó emailes automatika készül).", ro: "După adăugare, colegul poate fi asignat pe organigramă și pe planificatoarele de concedii. Contul de autentificare se creează separat, pe baza emailului." },
 };
 
 type I18n = {
