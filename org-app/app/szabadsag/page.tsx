@@ -7,13 +7,15 @@ import { useI18n } from "@/lib/i18n";
 import {
   LeaveStatic, LeaveEntry, Blackout, Holiday, Quota, Part,
   loadLeaveStatic, loadLeaveYear, addLeave, deleteLeave,
-  addBlackout, deleteBlackout, setRule, setQuota, setMembership,
+  addBlackout, deleteBlackout, updateBlackout, setRule, setQuota, setMembership,
   usedQuotaDays, partWeight,
 } from "@/lib/leave";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const AV_COLORS = ["#2f6fed", "#0e7c86", "#b3541e", "#2e7d32", "#8e3b8e", "#c2851a", "#1565c0", "#5b5f97"];
 const avColor = (s: string) => AV_COLORS[(s.charCodeAt(0) || 0) % AV_COLORS.length];
+const initialsOf = (n: string) => n.trim().split(/\s+/).map(w => w[0] || "").join("").slice(0, 2);
+const MIN_YEAR = 2027; // a modul 2027-től indul, korábbi év nem kell
 
 export default function SzabadsagPage() {
   const { t, lang, setLang, pick } = useI18n();
@@ -23,8 +25,8 @@ export default function SzabadsagPage() {
   const [st, setSt] = useState<LeaveStatic | null>(null);
   const [boardId, setBoardId] = useState<string>("");
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth()); // 0-11
+  const [year, setYear] = useState(Math.max(now.getFullYear(), MIN_YEAR));
+  const [month, setMonth] = useState(now.getFullYear() >= MIN_YEAR ? now.getMonth() : 0); // 0-11
   const [view, setView] = useState<"honap" | "ev">("honap");
   const [data, setData] = useState<{
     entries: LeaveEntry[]; blackouts: Blackout[]; holidays: Holiday[];
@@ -174,7 +176,7 @@ export default function SzabadsagPage() {
           </button>
           {view === "honap" ? (
             <>
-              <button className="mini-btn" onClick={() => {
+              <button className="mini-btn" disabled={year <= MIN_YEAR && month === 0} onClick={() => {
                 const m = month - 1; if (m < 0) { setMonth(11); setYear(year - 1); } else setMonth(m);
               }}>◀</button>
               <b className="period">{year}. {monthName(month)}</b>
@@ -184,7 +186,8 @@ export default function SzabadsagPage() {
             </>
           ) : (
             <>
-              <button className="mini-btn" onClick={() => setYear(year - 1)}>◀</button>
+              <button className="mini-btn" disabled={year <= MIN_YEAR}
+                      onClick={() => setYear(year - 1)}>◀</button>
               <b className="period">{year}</b>
               <button className="mini-btn" onClick={() => setYear(year + 1)}>▶</button>
             </>
@@ -247,51 +250,65 @@ export default function SzabadsagPage() {
           })}
         </div>
       ) : (
-        <div className="year-grid">
+        /* falitábla-nézet: 12 függőleges hónap-oszlop, hétköznap-sorokba igazítva */
+        <div className="wall"><div className="wall-inner">
+          <div className="wlabels">
+            <div className="wmonth">&nbsp;</div>
+            {Array.from({ length: 37 }, (_, r) => (
+              <div key={r} className={"wlab" + (r % 7 >= 5 ? " wwe" : "")}>
+                {new Date(2026, 5, 1 + (r % 7)).toLocaleDateString(locale, { weekday: "narrow" })}
+              </div>
+            ))}
+          </div>
           {Array.from({ length: 12 }, (_, m) => {
             const dim = new Date(year, m + 1, 0).getDate();
+            const off = (new Date(year, m, 1).getDay() + 6) % 7;
             return (
-              <div key={m} className="ymonth" onClick={() => { setMonth(m); setView("honap"); }}>
-                <div className="ymonth-name">{monthName(m)}</div>
-                <div className="ycells">
-                  {Array.from({ length: 7 }, (_, i) => (
-                    <span key={"h" + i} className="ydow">
-                      {new Date(2026, 5, i + 1).toLocaleDateString(locale, { weekday: "narrow" })}
-                    </span>
-                  ))}
-                  {Array.from({ length: (new Date(year, m, 1).getDay() + 6) % 7 }, (_, i) => (
-                    <span key={"p" + i} />
-                  ))}
-                  {Array.from({ length: dim }, (_, i) => {
-                    const day = iso(new Date(year, m, i + 1));
-                    const es = entriesByDay.get(day) ?? [];
-                    const blocked = blockedDays.has(day);
-                    const full = dayFull(day);
-                    const some = es.length > 0;
-                    const dow = new Date(year, m, i + 1).getDay();
-                    const hol = holidayMap.get(day);
-                    const tip = [
-                      day,
-                      hol ? "★ " + pick(hol.name_hu, hol.name_ro) : "",
-                      ...es.map(e => {
-                        const ty = typeMap.get(e.type_code);
-                        return (e.person?.name ?? "?") +
-                          (e.part !== "egesz" ? " (½" + (e.part === "de" ? "DE" : "DU") + ")" : "") +
-                          " — " + pick(ty?.name_hu ?? "", ty?.name_ro);
-                      }),
-                    ].filter(Boolean).join("\n");
-                    return (
-                      <span key={i} className={"ycell" +
-                        (blocked ? " yblocked" : full ? " yfull" : some ? " ysome" : "") +
-                        (dow === 0 || dow === 6 ? " ywe" : "") +
-                        (hol ? " yhol" : "")} title={tip}>{i + 1}</span>
-                    );
-                  })}
+              <div className="wcol" key={m}>
+                <div className="wmonth" onClick={() => { setMonth(m); setView("honap"); }}>
+                  {monthName(m)}
                 </div>
+                {Array.from({ length: 37 }, (_, r) => {
+                  const dnum = r - off + 1;
+                  const we = r % 7 >= 5;
+                  if (dnum < 1 || dnum > dim)
+                    return <div key={r} className={"wcell wempty" + (we ? " wwe" : "")} />;
+                  const day = iso(new Date(year, m, dnum));
+                  const es = entriesByDay.get(day) ?? [];
+                  const blocked = blockedDays.has(day);
+                  const hol = holidayMap.get(day);
+                  const tip = [
+                    day,
+                    hol ? "★ " + pick(hol.name_hu, hol.name_ro) : "",
+                    ...es.map(e => {
+                      const ty = typeMap.get(e.type_code);
+                      return (e.person?.name ?? "?") +
+                        (e.part !== "egesz" ? " (½" + (e.part === "de" ? "DE" : "DU") + ")" : "") +
+                        " — " + pick(ty?.name_hu ?? "", ty?.name_ro);
+                    }),
+                  ].filter(Boolean).join("\n");
+                  return (
+                    <div key={r} title={tip}
+                         className={"wcell" + (we ? " wwe" : "") +
+                           (hol ? " whol" : "") + (blocked ? " wblocked" : "")}
+                         onClick={() => { setMonth(m); setView("honap"); }}>
+                      <span className="wnum">{dnum}</span>
+                      <span className="wtags">
+                        {hol && <span className="wstar">★</span>}
+                        {es.slice(0, 4).map(e => (
+                          <i key={e.id} style={{ background: typeMap.get(e.type_code)?.color }}>
+                            {initialsOf(e.person?.name ?? "?")}
+                          </i>
+                        ))}
+                        {es.length > 4 && <span className="wmore">+{es.length - 4}</span>}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
-        </div>
+        </div></div>
       )}
 
       {/* saját bejegyzések */}
@@ -437,6 +454,7 @@ function AdminPanel({ st, boardId, year, lim, blackouts, quotas, onChanged }: {
   const [limVal, setLimVal] = useState(String(lim));
   const [bFrom, setBFrom] = useState(""); const [bTo, setBTo] = useState("");
   const [bReason, setBReason] = useState("");
+  const [bEditId, setBEditId] = useState<string | null>(null);
   const [qEdit, setQEdit] = useState<Record<string, string>>({});
   const memberSet = useMemo(() =>
     new Set(st.members.filter(m => m.board_id === boardId).map(m => m.person_id)),
@@ -476,9 +494,12 @@ function AdminPanel({ st, boardId, year, lim, blackouts, quotas, onChanged }: {
       <section>
         <h4>{t("blackouts")}</h4>
         {blackouts.map(b => (
-          <div className="my-row" key={b.id}>
+          <div className={"my-row" + (bEditId === b.id ? " editing-row" : "")} key={b.id}>
             <b>{b.from_day} → {b.to_day}</b>
             <span className="muted">{b.reason}</span>
+            <button className="pencil" onClick={() => {
+              setBEditId(b.id); setBFrom(b.from_day); setBTo(b.to_day); setBReason(b.reason ?? "");
+            }}>✎</button>
             <button className="del" onClick={() => run(() => deleteBlackout(b.id))}>✕</button>
           </div>
         ))}
@@ -489,11 +510,17 @@ function AdminPanel({ st, boardId, year, lim, blackouts, quotas, onChanged }: {
                  onChange={e => setBReason(e.target.value)} />
           <button className="mini-btn" disabled={!bFrom || !bTo}
                   onClick={() => run(async () => {
-                    await addBlackout(boardId, bFrom, bTo, bReason);
-                    setBFrom(""); setBTo(""); setBReason("");
+                    if (bEditId) await updateBlackout(bEditId, bFrom, bTo, bReason);
+                    else await addBlackout(boardId, bFrom, bTo, bReason);
+                    setBEditId(null); setBFrom(""); setBTo(""); setBReason("");
                   })}>
-            {t("add")}
+            {bEditId ? t("save") : t("add")}
           </button>
+          {bEditId && (
+            <button className="mini-btn" onClick={() => {
+              setBEditId(null); setBFrom(""); setBTo(""); setBReason("");
+            }}>{t("cancel")}</button>
+          )}
         </div>
       </section>
       <section>

@@ -105,6 +105,11 @@ export async function deleteBlackout(id: string) {
   const { error } = await supabase.from("blackout_periods").delete().eq("id", id);
   fail(error);
 }
+export async function updateBlackout(id: string, from: string, to: string, reason: string) {
+  const { error } = await supabase.from("blackout_periods")
+    .update({ from_day: from, to_day: to, reason: reason || null }).eq("id", id);
+  fail(error);
+}
 export async function setRule(boardId: string, key: string, value: string) {
   const { error } = await supabase.from("leave_rules").upsert({ board_id: boardId, key, value });
   fail(error);
