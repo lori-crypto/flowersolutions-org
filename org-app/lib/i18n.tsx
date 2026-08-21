@@ -94,6 +94,9 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   add:              { hu: "Hozzáadás", ro: "Adaugă" },
   quotas:           { hu: "Éves keretek", ro: "Zile alocate" },
   close:            { hu: "Bezárás", ro: "Închide" },
+  holidays_admin:   { hu: "Ünnepnapok", ro: "Sărbători legale" },
+  gen_holidays:     { hu: "Ünnepnapok feltöltése erre az évre", ro: "Completează sărbătorile pentru acest an" },
+  gen_holidays_hint:{ hu: "Fix ünnepek + ortodox és katolikus húsvét/pünkösd automatikusan kiszámolva. A meglévőket nem írja felül.", ro: "Sărbători fixe + Paștele/Rusaliile ortodoxe și catolice, calculate automat. Cele existente rămân." },
 };
 
 type I18n = {

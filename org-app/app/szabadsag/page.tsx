@@ -8,6 +8,7 @@ import {
   LeaveStatic, LeaveEntry, Blackout, Holiday, Quota, Part,
   loadLeaveStatic, loadLeaveYear, addLeave, deleteLeave,
   addBlackout, deleteBlackout, updateBlackout, setRule, setQuota, setMembership,
+  generateHolidays,
   usedQuotaDays, partWeight,
 } from "@/lib/leave";
 
@@ -256,28 +257,20 @@ export default function SzabadsagPage() {
       ) : (
         /* falitábla-nézet: 12 függőleges hónap-oszlop, hétköznap-sorokba igazítva */
         <div className="wall"><div className="wall-inner">
-          <div className="wlabels">
-            <div className="wmonth">&nbsp;</div>
-            {Array.from({ length: 37 }, (_, r) => (
-              <div key={r} className={"wlab" + (r % 7 >= 5 ? " wwe" : "")}>
-                {new Date(2026, 5, 1 + (r % 7)).toLocaleDateString(locale, { weekday: "narrow" })}
-              </div>
-            ))}
-          </div>
           {Array.from({ length: 12 }, (_, m) => {
             const dim = new Date(year, m + 1, 0).getDate();
-            const off = (new Date(year, m, 1).getDay() + 6) % 7;
             return (
               <div className="wcol" key={m}>
                 <div className="wmonth" onClick={() => { setMonth(m); setView("honap"); }}>
                   {monthName(m)}
                 </div>
-                {Array.from({ length: 37 }, (_, r) => {
-                  const dnum = r - off + 1;
-                  const we = r % 7 >= 5;
-                  if (dnum < 1 || dnum > dim)
-                    return <div key={r} className={"wcell wempty" + (we ? " wwe" : "")} />;
-                  const day = iso(new Date(year, m, dnum));
+                {Array.from({ length: 31 }, (_, r) => {
+                  const dnum = r + 1;
+                  if (dnum > dim)
+                    return <div key={r} className="wcell wempty" />;
+                  const dt = new Date(year, m, dnum);
+                  const day = iso(dt);
+                  const we = dt.getDay() === 0 || dt.getDay() === 6;
                   const es = entriesByDay.get(day) ?? [];
                   const blocked = blockedDays.has(day);
                   const hol = holidayMap.get(day);
@@ -296,6 +289,7 @@ export default function SzabadsagPage() {
                          className={"wcell" + (we ? " wwe" : "") +
                            (hol ? " whol" : "") + (blocked ? " wblocked" : "")}>
                       <span className="wnum">{dnum}</span>
+                      <span className="wdow">{dt.toLocaleDateString(locale, { weekday: "short" })}</span>
                       <span className="wtags">
                         {hol && <span className="wstar">★</span>}
                         {es.slice(0, 4).map(e => (
@@ -570,6 +564,14 @@ function AdminPanel({ st, boardId, year, lim, blackouts, quotas, onChanged }: {
             }}>{t("cancel")}</button>
           )}
         </div>
+      </section>
+      <section>
+        <h4>{t("holidays_admin")} · {year}</h4>
+        <button className="mini-btn"
+                onClick={() => run(async () => { await generateHolidays(year); })}>
+          {t("gen_holidays")}
+        </button>
+        <div className="fhint" style={{ marginTop: 4 }}>{t("gen_holidays_hint")}</div>
       </section>
       <section>
         <h4>{t("quotas")} · {year}</h4>

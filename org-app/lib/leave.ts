@@ -129,6 +129,76 @@ export async function setMembership(personId: string, boardId: string, member: b
   }
 }
 
+// ── Ünnepnap-generálás bármely évre ─────────────────────────
+const isoLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Ortodox húsvétvasárnap (Julián-számítás + 13 nap, 1900–2099 között érvényes). */
+function orthodoxEaster(y: number): Date {
+  const a = y % 4, b = y % 7, c = y % 19;
+  const d = (19 * c + 15) % 30;
+  const e = (2 * a + 4 * b - d + 34) % 7;
+  const month = Math.floor((d + e + 114) / 31);
+  const day = ((d + e + 114) % 31) + 1;
+  const dt = new Date(y, month - 1, day);
+  dt.setDate(dt.getDate() + 13);
+  return dt;
+}
+
+/** Katolikus (gregorián) húsvétvasárnap — Meeus-algoritmus. */
+function catholicEaster(y: number): Date {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(y, month - 1, day);
+}
+
+const plus = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+
+export function computeHolidays(y: number): { day: string; name_hu: string; name_ro: string }[] {
+  const oE = orthodoxEaster(y), cE = catholicEaster(y);
+  const fix = (m: number, d: number, hu: string, ro: string) =>
+    ({ day: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`, name_hu: hu, name_ro: ro });
+  const mov = (d: Date, hu: string, ro: string) => ({ day: isoLocal(d), name_hu: hu, name_ro: ro });
+  return [
+    fix(1, 1, "Újév", "Anul Nou"),
+    fix(1, 2, "Újév másnapja", "A doua zi de Anul Nou"),
+    fix(1, 6, "Vízkereszt", "Boboteaza"),
+    fix(1, 7, "Keresztelő Szt. János", "Sfântul Ioan Botezătorul"),
+    fix(1, 24, "Az egyesülés napja", "Ziua Unirii Principatelor"),
+    fix(5, 1, "A munka ünnepe", "Ziua Muncii"),
+    fix(6, 1, "Gyermeknap", "Ziua Copilului"),
+    fix(8, 15, "Nagyboldogasszony", "Adormirea Maicii Domnului"),
+    fix(11, 30, "Szt. András", "Sfântul Andrei"),
+    fix(12, 1, "Románia nemzeti ünnepe", "Ziua Națională"),
+    fix(12, 25, "Karácsony", "Crăciunul"),
+    fix(12, 26, "Karácsony másnapja", "A doua zi de Crăciun"),
+    mov(plus(oE, -2), "Nagypéntek (ortodox)", "Vinerea Mare"),
+    mov(oE, "Húsvét (ortodox)", "Paștele"),
+    mov(plus(oE, 1), "Húsvéthétfő (ortodox)", "A doua zi de Paște"),
+    mov(plus(oE, 49), "Pünkösd (ortodox)", "Rusaliile"),
+    mov(plus(oE, 50), "Pünkösdhétfő (ortodox)", "A doua zi de Rusalii"),
+    mov(plus(cE, -2), "Nagypéntek (katolikus)", "Vinerea Mare (catolică)"),
+    mov(cE, "Húsvét (katolikus)", "Paștele catolic"),
+    mov(plus(cE, 1), "Húsvéthétfő (katolikus)", "A doua zi de Paște (catolic)"),
+    mov(plus(cE, 49), "Pünkösd (katolikus)", "Rusaliile catolice"),
+    mov(plus(cE, 50), "Pünkösdhétfő (katolikus)", "A doua zi de Rusalii (catolic)"),
+  ];
+}
+
+/** Feltölti az adott év ünnepnapjait (meglévőket nem bántja). HR-jog kell hozzá. */
+export async function generateHolidays(year: number): Promise<number> {
+  const rows = computeHolidays(year);
+  const { error } = await supabase.from("holidays")
+    .upsert(rows, { onConflict: "day", ignoreDuplicates: true });
+  fail(error);
+  return rows.length;
+}
+
 // ── segédek ─────────────────────────────────────────────────
 export const partWeight = (p: Part) => (p === "egesz" ? 1 : 0.5);
 
