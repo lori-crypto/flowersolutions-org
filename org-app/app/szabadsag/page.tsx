@@ -265,7 +265,6 @@ export default function SzabadsagPage() {
                     const tip = [
                       day,
                       hol ? "★ " + pick(hol.name_hu, hol.name_ro) : "",
-                      blocked ? t("blocked") + (blockedDays.get(day) ? ": " + blockedDays.get(day) : "") : "",
                       ...es.map(e => {
                         const ty = typeMap.get(e.type_code);
                         return (e.person?.name ?? "?") +
