@@ -19,6 +19,9 @@ const AV_COLORS = ["#2f6fed", "#0e7c86", "#b3541e", "#2e7d32", "#8e3b8e", "#c285
 const avColor = (s: string) => AV_COLORS[(s.charCodeAt(0) || 0) % AV_COLORS.length];
 const initialsOf = (n: string) => n.trim().split(/\s+/).map(w => w[0] || "").join("").slice(0, 2);
 const MIN_YEAR = 2027; // a modul 2027-től indul, korábbi év nem kell
+// Román állami ünnep → románul; katolikus ünnep → magyarul
+const holName = (h: { name_hu: string; name_ro: string | null }) =>
+  h.name_hu.includes("katolikus") ? h.name_hu : (h.name_ro || h.name_hu);
 
 export default function SzabadsagPage() {
   const { t, lang, setLang, pick } = useI18n();
@@ -227,7 +230,7 @@ export default function SzabadsagPage() {
                   <span>{d.toLocaleDateString(locale, { weekday: "short" })}</span>
                 </div>
                 <div className="daymain">
-                  {holiday && <span className="holiday-tag">★ {holiday.name_ro || holiday.name_hu}</span>}
+                  {holiday && <span className="holiday-tag">★ {holName(holiday)}</span>}
                   {blocked && (
                     <span className="blocked-tag">
                       {t("blocked")}{blockedDays.get(day) ? " · " + blockedDays.get(day) : ""}
@@ -277,7 +280,7 @@ export default function SzabadsagPage() {
                   const hol = holidayMap.get(day);
                   const tip = [
                     day,
-                    hol ? "★ " + (hol.name_ro || hol.name_hu) : "",
+                    hol ? "★ " + holName(hol) : "",
                     ...es.map(e => {
                       const ty = typeMap.get(e.type_code);
                       return (e.person?.name ?? "?") +
@@ -379,7 +382,7 @@ export default function SzabadsagPage() {
                 {d.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
               </h3>
               {hol && <div className="holiday-tag" style={{ display: "inline-block", marginBottom: 8 }}>
-                ★ {hol.name_ro || hol.name_hu}</div>}
+                ★ {holName(hol)}</div>}
               {blocked && <div className="blocked-banner">
                 {t("blocked")}{reason ? " · " + reason : ""}</div>}
               {es.length === 0 && <div className="muted" style={{ margin: "8px 0" }}>{t("no_entries")}</div>}

@@ -220,7 +220,7 @@ body.editing .hint{display:block}
 .day-add:disabled{opacity:.35; cursor:default}
 
 /* falitábla-nézet */
-.wall{overflow-x:auto; padding:10px 12px 80px}
+.wall{overflow-x:auto; padding:10px 12px 80px; overscroll-behavior-x:contain}
 .wall-inner{display:flex; min-width:1150px; width:100%;
   background:var(--card); border:1px solid var(--line); border-radius:12px; padding:8px 8px 10px}
 .wcol{flex:1; min-width:0; border-left:1px solid var(--line)}
@@ -321,7 +321,7 @@ body.editing .hint{display:block}
   .ceo{width:100%}
   .wires{display:none}
   .gridN{display:flex; overflow-x:auto; scroll-snap-type:x mandatory; gap:12px;
-    padding:10px 12px; scrollbar-width:none}
+    padding:10px 12px; scrollbar-width:none; overscroll-behavior-x:contain}
   .gridN::-webkit-scrollbar{display:none}
   /* csoportvezetők: egymás mellett, arányosan elosztva, csúszkálás nélkül */
   .glead-row{flex-direction:row; overflow-x:visible; scroll-snap-type:none; gap:8px;
