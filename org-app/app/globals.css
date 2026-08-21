@@ -220,19 +220,19 @@ body.editing .hint{display:block}
 .day-add:disabled{opacity:.35; cursor:default}
 
 /* falitábla-nézet */
-.wall{overflow-x:auto; padding:14px 16px 90px}
-.wall-inner{display:flex; min-width:1150px; max-width:1700px; margin:0 auto;
+.wall{overflow-x:auto; padding:10px 12px 80px}
+.wall-inner{display:flex; min-width:1150px; width:100%;
   background:var(--card); border:1px solid var(--line); border-radius:12px; padding:8px 8px 10px}
 .wlabels{flex:0 0 26px}
 .wcol{flex:1; min-width:0; border-left:1px solid var(--line)}
 .wmonth{height:28px; font-size:12px; font-weight:700; display:flex; align-items:center;
   justify-content:center; cursor:pointer; text-transform:capitalize; color:var(--ink)}
 .wmonth:hover{color:var(--accent)}
-.wlab{height:23px; font-size:8.5px; color:var(--muted); display:flex; align-items:center;
-  justify-content:center; text-transform:uppercase; font-weight:700}
+.wlab{height:max(23px, calc((100vh - 285px)/37)); font-size:8.5px; color:var(--muted);
+  display:flex; align-items:center; justify-content:center; text-transform:uppercase; font-weight:700}
 .wlab.wwe{background:#e6e9ee; border-radius:4px 0 0 4px}
-.wcell{height:23px; display:flex; align-items:center; gap:2px; padding:0 3px;
-  border-top:1px solid #f0f2f5; cursor:pointer; overflow:hidden}
+.wcell{height:max(23px, calc((100vh - 285px)/37)); display:flex; align-items:center;
+  gap:2px; padding:0 3px; border-top:1px solid #f0f2f5; cursor:pointer; overflow:hidden}
 .wcell:hover{background:#f2f6ff}
 .wcell.wwe{background:#e6e9ee}
 .wcell.whol{background:#dff0e5}
