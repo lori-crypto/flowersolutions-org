@@ -38,7 +38,7 @@ export default function SzabadsagPage() {
     entries: LeaveEntry[]; blackouts: Blackout[]; holidays: Holiday[];
     quota: Quota | null; myEntries: LeaveEntry[];
   } | null>(null);
-  const [showAdd, setShowAdd] = useState<null | { from: string; to: string }>(null);
+  const [showAdd, setShowAdd] = useState<null | { from: string; to: string; type?: string }>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [showAdmin, setShowAdmin] = useState(false);
   const [quotasAll, setQuotasAll] = useState<Quota[]>([]);
@@ -441,6 +441,12 @@ export default function SzabadsagPage() {
               })}
               <div className="btns">
                 <button className="btn-cancel" onClick={() => setDayModal(null)}>{t("close")}</button>
+                {st.isHr && (
+                  <button className="btn-duty"
+                          onClick={() => { setDayModal(null); setShowAdd({ from: day, to: day, type: "ugyelet" }); }}>
+                    ＋ {t("add_duty")}
+                  </button>
+                )}
                 <button className="btn-save" disabled={!canWriteDay(day)}
                         onClick={() => { setDayModal(null); setShowAdd({ from: day, to: day }); }}>
                   ＋ {t("add_leave")}
@@ -457,7 +463,7 @@ export default function SzabadsagPage() {
 // ── Beíró modal ───────────────────────────────────────────────
 function AddModal({ st, defaults, onClose, onSave }: {
   st: LeaveStatic;
-  defaults: { from: string; to: string };
+  defaults: { from: string; to: string; type?: string };
   onClose: () => void;
   onSave: (f: { person: string; from: string; to: string; part: Part; type: string; note: string; skipWeekend: boolean }) => Promise<void>;
 }) {
@@ -467,11 +473,11 @@ function AddModal({ st, defaults, onClose, onSave }: {
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
   const [part, setPart] = useState<Part>("egesz");
-  const [type, setTypeRaw] = useState(selectableTypes[0]?.code ?? "szabadsag");
+  const [type, setTypeRaw] = useState(defaults.type ?? selectableTypes[0]?.code ?? "szabadsag");
   const [note, setNote] = useState("");
-  // ha a kiválasztott nap hétvége (pl. ügyelethez), ne szűrjük ki alapból
+  // hétvégi napnál vagy ügyeletnél ne szűrjük ki a hétvégét alapból
   const startIsWeekend = [0, 6].includes(new Date(defaults.from + "T00:00:00").getDay());
-  const [skipWeekend, setSkipWeekend] = useState(!startIsWeekend);
+  const [skipWeekend, setSkipWeekend] = useState(!startIsWeekend && defaults.type !== "ugyelet");
   const setType = (code: string) => {
     setTypeRaw(code);
     if (code === "ugyelet") setSkipWeekend(false); // az ügyelet tipikusan hétvégére esik

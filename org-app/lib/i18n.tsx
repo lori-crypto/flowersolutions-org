@@ -104,6 +104,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   duty_repeat_done: { hu: "Ügyelet-másolás kész", ro: "Copierea s-a terminat" },
   duty_no_pattern:  { hu: "Előbb írj be legalább egy hétvégi ügyeletet mintának.", ro: "Mai întâi completează cel puțin un weekend ca model." },
   duty_no_targets:  { hu: "Nincs üres hétvége a minta után.", ro: "Nu există weekenduri libere după model." },
+  add_duty:         { hu: "Ügyelet", ro: "Serviciu" },
 };
 
 type I18n = {

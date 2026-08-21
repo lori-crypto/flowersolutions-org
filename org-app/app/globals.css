@@ -299,6 +299,7 @@ body.editing .hint{display:block}
 .modal .btns button{border-radius:9px; padding:8px 16px; cursor:pointer; font-size:13.5px}
 .btn-cancel{border:1.5px solid var(--line); background:none; color:var(--muted)}
 .btn-save{border:none; background:var(--accent); color:#fff; font-weight:600}
+.btn-duty{border:none; background:#c0392b; color:#fff; font-weight:600}
 .btn-save:disabled{opacity:.6}
 .modal .err{color:var(--empty); font-size:12.5px; margin-top:10px}
 .person-list{border:1.5px solid var(--line); border-radius:9px; max-height:180px; overflow-y:auto; margin-top:4px}
