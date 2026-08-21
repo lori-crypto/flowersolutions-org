@@ -78,13 +78,19 @@ export default function SzabadsagPage() {
   }, [data]);
 
   const blockedDays = useMemo(() => {
-    const s = new Set<string>();
+    const m = new Map<string, string>(); // nap → indoklás(ok)
     for (const b of data?.blackouts ?? []) {
       const d = new Date(b.from_day + "T00:00:00");
       const end = new Date(b.to_day + "T00:00:00");
-      while (d <= end) { s.add(iso(d)); d.setDate(d.getDate() + 1); }
+      while (d <= end) {
+        const k = iso(d);
+        const prev = m.get(k);
+        const r = b.reason || "";
+        m.set(k, prev ? (r && !prev.includes(r) ? prev + " · " + r : prev) : r);
+        d.setDate(d.getDate() + 1);
+      }
     }
-    return s;
+    return m;
   }, [data]);
 
   const holidayMap = useMemo(() =>
@@ -214,7 +220,11 @@ export default function SzabadsagPage() {
                 </div>
                 <div className="daymain">
                   {holiday && <span className="holiday-tag">★ {pick(holiday.name_hu, holiday.name_ro)}</span>}
-                  {blocked && <span className="blocked-tag">{t("blocked")}</span>}
+                  {blocked && (
+                    <span className="blocked-tag">
+                      {t("blocked")}{blockedDays.get(day) ? " · " + blockedDays.get(day) : ""}
+                    </span>
+                  )}
                   {es.map(e => {
                     const ty = typeMap.get(e.type_code);
                     return (
@@ -251,11 +261,23 @@ export default function SzabadsagPage() {
                     const full = dayFull(day);
                     const some = es.length > 0;
                     const dow = new Date(year, m, i + 1).getDay();
+                    const hol = holidayMap.get(day);
+                    const tip = [
+                      day,
+                      hol ? "★ " + pick(hol.name_hu, hol.name_ro) : "",
+                      blocked ? t("blocked") + (blockedDays.get(day) ? ": " + blockedDays.get(day) : "") : "",
+                      ...es.map(e => {
+                        const ty = typeMap.get(e.type_code);
+                        return (e.person?.name ?? "?") +
+                          (e.part !== "egesz" ? " (½" + (e.part === "de" ? "DE" : "DU") + ")" : "") +
+                          " — " + pick(ty?.name_hu ?? "", ty?.name_ro);
+                      }),
+                    ].filter(Boolean).join("\n");
                     return (
                       <span key={i} className={"ycell" +
                         (blocked ? " yblocked" : full ? " yfull" : some ? " ysome" : "") +
                         (dow === 0 || dow === 6 ? " ywe" : "") +
-                        (holidayMap.has(day) ? " yhol" : "")} title={day} />
+                        (hol ? " yhol" : "")} title={tip}>{i + 1}</span>
                     );
                   })}
                 </div>

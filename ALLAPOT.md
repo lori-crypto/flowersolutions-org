@@ -42,8 +42,12 @@ Utolsó frissítés: 2026-08-19
   utána jöhet az 1. ütem építése
 - ⏳ Változásnapló nézet + visszavonás admin felületen (a napló már gyűlik)
 
-- ⏳ Szabadságos tábla modul — **követelmények és terv kész**
-  (`MODUL_03_szabadsag_KOVETELMENYEK.md`), 5 nyitott kérdés; indulás 2027-től
+- ✅ Szabadságos tábla modul **1. ütem MEGÉPÍTVE** (2026-08-19): 3 egység-tábla
+  (Lerakat, Virágüzlet 1-2), hónap/év nézet, önkiszolgáló beírás fél nappal,
+  szabályok DB-szinten (zárolt napok, táblánként állítható napi korlát,
+  versenybiztos), keret-számláló, HR-panel (tagok/korlát/zárolás/keretek),
+  RO ünnepnapok 2027-re. **Teendő: `sql/04_szabadsag.sql` futtatása a Supabase-ben!**
+  Hátravan (2-3. ütem): ügyelet-beosztás + csere, értesítések, nyomtatás.
 
 ## Későbbi modulok
 
