@@ -232,8 +232,7 @@ body.editing .hint{display:block}
   display:flex; align-items:center; justify-content:center; text-transform:uppercase; font-weight:700}
 .wlab.wwe{background:#e6e9ee; border-radius:4px 0 0 4px}
 .wcell{height:max(23px, calc((100vh - 285px)/37)); display:flex; align-items:center;
-  gap:2px; padding:0 3px; border-top:1px solid #f0f2f5; cursor:pointer; overflow:hidden}
-.wcell:hover{background:#f2f6ff}
+  gap:2px; padding:0 3px; border-top:1px solid #f0f2f5; cursor:default; overflow:hidden}
 .wcell.wwe{background:#e6e9ee}
 .wcell.whol{background:#dff0e5}
 .wcell.wblocked{background:#f3b6ad; box-shadow:inset 3px 0 0 var(--empty)}

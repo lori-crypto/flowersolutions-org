@@ -290,8 +290,7 @@ export default function SzabadsagPage() {
                   return (
                     <div key={r} title={tip}
                          className={"wcell" + (we ? " wwe" : "") +
-                           (hol ? " whol" : "") + (blocked ? " wblocked" : "")}
-                         onClick={() => { setMonth(m); setView("honap"); }}>
+                           (hol ? " whol" : "") + (blocked ? " wblocked" : "")}>
                       <span className="wnum">{dnum}</span>
                       <span className="wtags">
                         {hol && <span className="wstar">★</span>}
