@@ -18,7 +18,7 @@ const iso = (d: Date) =>
 const AV_COLORS = ["#2f6fed", "#0e7c86", "#b3541e", "#2e7d32", "#8e3b8e", "#c2851a", "#1565c0", "#5b5f97"];
 const avColor = (s: string) => AV_COLORS[(s.charCodeAt(0) || 0) % AV_COLORS.length];
 const initialsOf = (n: string) => n.trim().split(/\s+/).map(w => w[0] || "").join("").slice(0, 2);
-const MIN_YEAR = 2027; // a modul 2027-től indul, korábbi év nem kell
+const MIN_YEAR = 2026;
 // Román állami ünnep → románul; katolikus ünnep → magyarul
 const holName = (h: { name_hu: string; name_ro: string | null }) =>
   h.name_hu.includes("katolikus") ? h.name_hu : (h.name_ro || h.name_hu);
