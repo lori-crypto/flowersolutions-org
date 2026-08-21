@@ -24,7 +24,11 @@ export default function TablaPage() {
   const [loadErr, setLoadErr] = useState("");
 
   const reload = useCallback(async () => {
-    try { setBoard(await loadBoard()); }
+    try {
+      const b = await loadBoard();
+      setBoard(b);
+      try { localStorage.setItem("cache:board", JSON.stringify(b)); } catch {}
+    }
     catch (e) { setLoadErr((e as Error).message); }
   }, []);
 
@@ -32,6 +36,11 @@ export default function TablaPage() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
+      // amíg a friss adat töltődik, az utoljára látott tábla jelenik meg (nincs üres oldal)
+      try {
+        const c = localStorage.getItem("cache:board");
+        if (c) setBoard(JSON.parse(c));
+      } catch {}
       const { data: caps } = await supabase.from("person_capabilities").select("capability");
       const capSet = new Set((caps ?? []).map(c => c.capability));
       setCanEdit(capSet.has("admin") || capSet.has("tabla.szerkesztes"));
