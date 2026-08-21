@@ -429,9 +429,15 @@ function AddModal({ st, defaults, onClose, onSave }: {
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
   const [part, setPart] = useState<Part>("egesz");
-  const [type, setType] = useState(selectableTypes[0]?.code ?? "szabadsag");
+  const [type, setTypeRaw] = useState(selectableTypes[0]?.code ?? "szabadsag");
   const [note, setNote] = useState("");
-  const [skipWeekend, setSkipWeekend] = useState(true);
+  // ha a kiválasztott nap hétvége (pl. ügyelethez), ne szűrjük ki alapból
+  const startIsWeekend = [0, 6].includes(new Date(defaults.from + "T00:00:00").getDay());
+  const [skipWeekend, setSkipWeekend] = useState(!startIsWeekend);
+  const setType = (code: string) => {
+    setTypeRaw(code);
+    if (code === "ugyelet") setSkipWeekend(false); // az ügyelet tipikusan hétvégére esik
+  };
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
