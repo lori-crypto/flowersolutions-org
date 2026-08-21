@@ -27,7 +27,7 @@ export default function SzabadsagPage() {
   const now = new Date();
   const [year, setYear] = useState(Math.max(now.getFullYear(), MIN_YEAR));
   const [month, setMonth] = useState(now.getFullYear() >= MIN_YEAR ? now.getMonth() : 0); // 0-11
-  const [view, setView] = useState<"honap" | "ev">("honap");
+  const [view, setView] = useState<"honap" | "ev">("ev");
   const [data, setData] = useState<{
     entries: LeaveEntry[]; blackouts: Blackout[]; holidays: Holiday[];
     quota: Quota | null; myEntries: LeaveEntry[];
