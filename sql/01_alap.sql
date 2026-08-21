@@ -68,20 +68,21 @@ returns boolean language sql stable security definer set search_path = public as
 $$;
 
 -- ── Audit trigger (generikus) ────────────────────────────────
+-- to_jsonb(...)->>'id' — így id oszlop nélküli táblákon is működik
 create or replace function app_audit()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
   if tg_op = 'INSERT' then
     insert into audit_log (person_id, table_name, row_id, action, after)
-    values (app_current_person(), tg_table_name, new.id::text, 'insert', to_jsonb(new));
+    values (app_current_person(), tg_table_name, to_jsonb(new)->>'id', 'insert', to_jsonb(new));
     return new;
   elsif tg_op = 'UPDATE' then
     insert into audit_log (person_id, table_name, row_id, action, before, after)
-    values (app_current_person(), tg_table_name, new.id::text, 'update', to_jsonb(old), to_jsonb(new));
+    values (app_current_person(), tg_table_name, to_jsonb(new)->>'id', 'update', to_jsonb(old), to_jsonb(new));
     return new;
   else
     insert into audit_log (person_id, table_name, row_id, action, before)
-    values (app_current_person(), tg_table_name, old.id::text, 'delete', to_jsonb(old));
+    values (app_current_person(), tg_table_name, to_jsonb(old)->>'id', 'delete', to_jsonb(old));
     return old;
   end if;
 end $$;
