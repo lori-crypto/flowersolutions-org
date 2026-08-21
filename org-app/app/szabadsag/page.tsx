@@ -254,6 +254,14 @@ export default function SzabadsagPage() {
               <div key={m} className="ymonth" onClick={() => { setMonth(m); setView("honap"); }}>
                 <div className="ymonth-name">{monthName(m)}</div>
                 <div className="ycells">
+                  {Array.from({ length: 7 }, (_, i) => (
+                    <span key={"h" + i} className="ydow">
+                      {new Date(2026, 5, i + 1).toLocaleDateString(locale, { weekday: "narrow" })}
+                    </span>
+                  ))}
+                  {Array.from({ length: (new Date(year, m, 1).getDay() + 6) % 7 }, (_, i) => (
+                    <span key={"p" + i} />
+                  ))}
                   {Array.from({ length: dim }, (_, i) => {
                     const day = iso(new Date(year, m, i + 1));
                     const es = entriesByDay.get(day) ?? [];
