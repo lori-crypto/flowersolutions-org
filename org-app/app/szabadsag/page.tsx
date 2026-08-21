@@ -119,8 +119,9 @@ export default function SzabadsagPage() {
     new Date(year, m, 1).toLocaleDateString(locale, { month: "long" });
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+  // A szabályok mindenkire érvényesek (HR-re is): zárolt vagy betelt napra nem megy beírás
   const canWriteDay = (day: string) =>
-    st.isHr || (!blockedDays.has(day) && !dayFull(day));
+    !blockedDays.has(day) && !dayFull(day);
 
   async function submitAdd(form: {
     person: string; from: string; to: string; part: Part; type: string;

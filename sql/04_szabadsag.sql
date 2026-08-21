@@ -176,22 +176,23 @@ begin
       raise exception '% napra már van bejegyzésed.', to_char(d, 'YYYY-MM-DD');
     end if;
 
-    if not priv then
-      if exists (
-        select 1 from blackout_periods b
-        where b.board_id = p_board and d between b.from_day and b.to_day
-      ) then
-        raise exception 'A % nap zárolva van — erre nem írható be szabadság.', to_char(d, 'YYYY-MM-DD');
-      end if;
-      if t.limit_szamit then
-        select count(distinct e.person_id) into cnt
-        from leave_entries e
-        join leave_types tt on tt.code = e.type_code
-        where e.board_id = p_board and e.day = d
-          and tt.limit_szamit and e.person_id <> p_person;
-        if cnt >= lim then
-          raise exception 'A % napra már betelt a létszám (legfeljebb % fő lehet távol).', to_char(d, 'YYYY-MM-DD'), lim;
-        end if;
+    -- Zárolt nap: önkiszolgáló típusnál mindenkire érvényes (HR-re is).
+    if t.self_service and exists (
+      select 1 from blackout_periods b
+      where b.board_id = p_board and d between b.from_day and b.to_day
+    ) then
+      raise exception 'A % nap zárolva van — erre nem írható be szabadság.', to_char(d, 'YYYY-MM-DD');
+    end if;
+
+    -- Napi létszám-korlát: mindenkire érvényes.
+    if t.limit_szamit then
+      select count(distinct e.person_id) into cnt
+      from leave_entries e
+      join leave_types tt on tt.code = e.type_code
+      where e.board_id = p_board and e.day = d
+        and tt.limit_szamit and e.person_id <> p_person;
+      if cnt >= lim then
+        raise exception 'A % napra már betelt a létszám (legfeljebb % fő lehet távol).', to_char(d, 'YYYY-MM-DD'), lim;
       end if;
     end if;
 
