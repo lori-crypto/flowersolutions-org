@@ -103,7 +103,13 @@ insert into holidays (day, name_hu, name_ro) values
   ('2027-11-30','Szt. András','Sfântul Andrei'),
   ('2027-12-01','Románia nemzeti ünnepe','Ziua Națională'),
   ('2027-12-25','Karácsony','Crăciunul'),
-  ('2027-12-26','Karácsony másnapja','A doua zi de Crăciun')
+  ('2027-12-26','Karácsony másnapja','A doua zi de Crăciun'),
+  -- katolikus ünnepek
+  ('2027-03-26','Nagypéntek (katolikus)','Vinerea Mare (catolică)'),
+  ('2027-03-28','Húsvét (katolikus)','Paștele catolic'),
+  ('2027-03-29','Húsvéthétfő (katolikus)','A doua zi de Paște (catolic)'),
+  ('2027-05-16','Pünkösd (katolikus)','Rusaliile catolice'),
+  ('2027-05-17','Pünkösdhétfő (katolikus)','A doua zi de Rusalii (catolic)')
 on conflict (day) do nothing;
 
 -- ── HR képesség ─────────────────────────────────────────────

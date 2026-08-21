@@ -11,7 +11,9 @@ import {
   usedQuotaDays, partWeight,
 } from "@/lib/leave";
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+// Helyi dátum → YYYY-MM-DD (NEM UTC! különben UTC+2-ben egy napot csúszna)
+const iso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const AV_COLORS = ["#2f6fed", "#0e7c86", "#b3541e", "#2e7d32", "#8e3b8e", "#c2851a", "#1565c0", "#5b5f97"];
 const avColor = (s: string) => AV_COLORS[(s.charCodeAt(0) || 0) % AV_COLORS.length];
 const initialsOf = (n: string) => n.trim().split(/\s+/).map(w => w[0] || "").join("").slice(0, 2);
@@ -223,7 +225,7 @@ export default function SzabadsagPage() {
                   <span>{d.toLocaleDateString(locale, { weekday: "short" })}</span>
                 </div>
                 <div className="daymain">
-                  {holiday && <span className="holiday-tag">★ {pick(holiday.name_hu, holiday.name_ro)}</span>}
+                  {holiday && <span className="holiday-tag">★ {holiday.name_ro || holiday.name_hu}</span>}
                   {blocked && (
                     <span className="blocked-tag">
                       {t("blocked")}{blockedDays.get(day) ? " · " + blockedDays.get(day) : ""}
@@ -281,7 +283,7 @@ export default function SzabadsagPage() {
                   const hol = holidayMap.get(day);
                   const tip = [
                     day,
-                    hol ? "★ " + pick(hol.name_hu, hol.name_ro) : "",
+                    hol ? "★ " + (hol.name_ro || hol.name_hu) : "",
                     ...es.map(e => {
                       const ty = typeMap.get(e.type_code);
                       return (e.person?.name ?? "?") +
@@ -382,7 +384,7 @@ export default function SzabadsagPage() {
                 {d.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
               </h3>
               {hol && <div className="holiday-tag" style={{ display: "inline-block", marginBottom: 8 }}>
-                ★ {pick(hol.name_hu, hol.name_ro)}</div>}
+                ★ {hol.name_ro || hol.name_hu}</div>}
               {blocked && <div className="blocked-banner">
                 {t("blocked")}{reason ? " · " + reason : ""}</div>}
               {es.length === 0 && <div className="muted" style={{ margin: "8px 0" }}>{t("no_entries")}</div>}
