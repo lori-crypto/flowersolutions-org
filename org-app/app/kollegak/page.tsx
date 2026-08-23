@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { LeaveBoard, BoardMember, setMembership } from "@/lib/leave";
 
@@ -26,7 +26,7 @@ export default function KollegakPage() {
   const [adding, setAdding] = useState(false);
   const [err, setErr] = useState("");
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async () => await withAuthRetry(async () => {
     const [pQ, bQ, mQ] = await Promise.all([
       supabase.from("persons").select("*").order("active", { ascending: false }).order("name"),
       supabase.from("leave_boards").select("*").order("sort"),
@@ -36,7 +36,7 @@ export default function KollegakPage() {
     setPersons((pQ.data as PersonRow[]) ?? []);
     setBoards((bQ.data as LeaveBoard[]) ?? []);
     setMembers((mQ.data as BoardMember[]) ?? []);
-  }, []);
+  }), []);
 
   useEffect(() => {
     (async () => {

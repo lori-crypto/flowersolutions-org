@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { loadPostList, PostMeta, DescStatus } from "@/lib/postdesc";
 
@@ -18,7 +18,7 @@ export default function PosztleirasokPage() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
-      try { setData(await loadPostList()); }
+      try { setData(await withAuthRetry(() => loadPostList())); }
       catch (e) { setErr((e as Error).message); }
     })();
   }, [router]);

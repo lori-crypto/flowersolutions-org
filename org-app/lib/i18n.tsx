@@ -152,6 +152,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   pd_tpl_purpose:   { hu: "A poszt célja", ro: "Scopul postului" },
   pd_tpl_duties:    { hu: "Feladatok és felelősségek", ro: "Sarcini și responsabilități" },
   pd_tpl_procedures:{ hu: "Eljárások, tudnivalók", ro: "Proceduri" },
+  retry:            { hu: "Újratöltés", ro: "Reîncarcă" },
 };
 
 type I18n = {

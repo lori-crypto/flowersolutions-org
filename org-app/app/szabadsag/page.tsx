@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { shortName } from "@/lib/names";
 import {
@@ -47,7 +47,7 @@ export default function SzabadsagPage() {
 
   const reloadYear = useCallback(async (b = boardId, y = year, meId = st?.me?.id ?? null) => {
     if (!b) return;
-    try { setData(await loadLeaveYear(b, y, meId)); setErr(""); }
+    try { setData(await withAuthRetry(() => loadLeaveYear(b, y, meId))); setErr(""); }
     catch (e) { setErr((e as Error).message); }
   }, [boardId, year, st]);
 
@@ -56,12 +56,12 @@ export default function SzabadsagPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
       try {
-        const s = await loadLeaveStatic();
+        const s = await withAuthRetry(() => loadLeaveStatic());
         setSt(s);
         const myBoard = s.members.find(m => m.person_id === s.me?.id)?.board_id;
         const b = myBoard ?? s.boards[0]?.id ?? "";
         setBoardId(b);
-        if (b) setData(await loadLeaveYear(b, year, s.me?.id ?? null));
+        if (b) setData(await withAuthRetry(() => loadLeaveYear(b, year, s.me?.id ?? null)));
       } catch (e) { setErr((e as Error).message); }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,7 +112,12 @@ export default function SzabadsagPage() {
     return ppl.size >= lim;
   };
 
-  if (err && !st) return <div className="center-msg">Hiba: {err}</div>;
+  if (err && !st) return (
+    <div className="center-msg">Hiba: {err}<br />
+      <button className="mini-btn" style={{ marginTop: 10 }}
+              onClick={() => window.location.reload()}>↻ {t("retry")}</button>
+    </div>
+  );
   if (!st || !data) return <div className="center-msg">{t("loading")}</div>;
 
   const board = st.boards.find(b => b.id === boardId);

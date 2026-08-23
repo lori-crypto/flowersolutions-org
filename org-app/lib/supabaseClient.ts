@@ -28,3 +28,15 @@ export const supabase = createClient(
   clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) || "placeholder-anon-key",
   { auth: { persistSession: true, autoRefreshToken: true, storage: authStorage } }
 );
+
+/** Lejárt token (JWT expired) esetén megújítja a munkamenetet és egyszer újrapróbálja. */
+export async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try { return await fn(); }
+  catch (e) {
+    if (/jwt|token|expired/i.test((e as Error)?.message ?? "")) {
+      const { error } = await supabase.auth.refreshSession();
+      if (!error) return await fn();
+    }
+    throw e;
+  }
+}

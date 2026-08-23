@@ -37,9 +37,13 @@ Utolsó frissítés: 2026-08-19
   + DNS CNAME (`org` → `cname.vercel-dns.com`)
 - ⏳ Service worker (olvasó offline cache)
 - ⏳ Meghívó emailes fiók-létrehozás (Resend) — admin felület személyekhez/fiókokhoz
-- ⏳ Posztleírások modul — **követelmények és terv kész**
-  (`MODUL_02_posztleirasok_KOVETELMENYEK.md`), 4 nyitott kérdés vár válaszra;
-  utána jöhet az 1. ütem építése
+- 🔨 Posztleírások modul **1. kör MEGÉPÍTVE** (2026-08-23): teljes adatmodell
+  (`sql/08_posztleirasok.sql` — **futtatandó!**), lista + részletes oldal,
+  kétnyelvű markdown-szerkesztő verziózott kiadással, szószedet automatikus
+  kiemeléssel + kattintható definíció-buborék, olvasási jog (betöltő/delegált/HR).
+  **Hátravan (2. kör): ellenőrzőlap-felület** (lépések szerkesztése, pipálás
+  sorrend-kényszerrel, elméleti válasz, HR-ellenjegyzés — az adatmodell és az
+  RPC-k már készen vannak), delegálás-kezelő UI, nyomtatható nézet.
 - ⏳ Változásnapló nézet + visszavonás admin felületen (a napló már gyűlik)
 
 - ✅ Szabadságos tábla modul **1. ütem MEGÉPÍTVE** (2026-08-19): 3 egység-tábla

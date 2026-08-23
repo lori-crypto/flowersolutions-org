@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { mdToHtml } from "@/lib/md";
 import {
@@ -30,7 +30,7 @@ export default function PosztleirasDetailPage() {
   const [showGloss, setShowGloss] = useState(false);
 
   const reload = useCallback(async () => {
-    try { setData(await loadPostDetail(postId)); }
+    try { setData(await withAuthRetry(() => loadPostDetail(postId))); }
     catch (e) { setErr((e as Error).message); }
   }, [postId]);
 

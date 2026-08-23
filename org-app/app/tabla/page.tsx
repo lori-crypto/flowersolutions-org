@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import {
   Board, Division, Department, Post, Group,
@@ -25,8 +25,9 @@ export default function TablaPage() {
 
   const reload = useCallback(async () => {
     try {
-      const b = await loadBoard();
+      const b = await withAuthRetry(() => loadBoard());
       setBoard(b);
+      setLoadErr("");
       try { localStorage.setItem("cache:board", JSON.stringify(b)); } catch {}
     }
     catch (e) { setLoadErr((e as Error).message); }
@@ -195,7 +196,12 @@ export default function TablaPage() {
   }
 
   // ── megjelenítés ────────────────────────────────────────────
-  if (loadErr) return <div className="center-msg">Hiba: {loadErr}</div>;
+  if (loadErr) return (
+    <div className="center-msg">Hiba: {loadErr}<br />
+      <button className="mini-btn" style={{ marginTop: 10 }}
+              onClick={() => window.location.reload()}>↻ {t("retry")}</button>
+    </div>
+  );
   if (!board) return <div className="center-msg">{t("loading")}</div>;
 
   const divisions: (Division & { group: Group })[] =
