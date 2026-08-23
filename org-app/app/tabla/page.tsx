@@ -234,6 +234,7 @@ export default function TablaPage() {
           <Link href="/tabla" className="active">{t("nav_tabla")}</Link>
           <Link href="/szabadsag">{t("nav_leave")}</Link>
           <Link href="/kollegak">{t("nav_people")}</Link>
+          <Link href="/posztleirasok">{t("nav_desc")}</Link>
         </nav>
         <span className="sp" />
         <button className="lang-btn" title="Frissítés / Reîmprospătare"
@@ -384,7 +385,9 @@ export default function TablaPage() {
                       </div>
                       {p.holders.length > 0 && <HolderChips post={p} />}
                       <div className="post-detail">
-                        <b>{t("post_evt")}:</b> {pick(p.evt_hu, p.evt_ro) || "—"}
+                        <b>{t("post_evt")}:</b> {pick(p.evt_hu, p.evt_ro) || "—"}<br />
+                        <Link href={`/posztleirasok/${p.id}`}
+                              onClick={e => e.stopPropagation()}>{t("post_desc")} →</Link>
                       </div>
                     </div>
                   ))}

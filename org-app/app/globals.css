@@ -299,6 +299,39 @@ body.editing .hint{display:block}
 .board-check{display:flex; align-items:center; gap:5px; cursor:pointer}
 .board-check input{accent-color:var(--accent)}
 
+/* ── posztleírások ────────────────────────────────────────── */
+.pd-card{display:flex; align-items:center; gap:10px; background:var(--card);
+  border:1px solid var(--line); border-radius:12px; padding:11px 14px; margin-bottom:8px;
+  text-decoration:none; color:var(--ink)}
+.pd-card:hover{border-color:var(--accent)}
+.pd-card-main{flex:1; min-width:0}
+.pd-card-main .muted{font-size:12px; margin-top:2px}
+.pd-arrow{color:var(--muted)}
+.my-post-tag{font-size:10.5px; font-weight:700; color:#1a4fbc; background:#e8f0fe;
+  border-radius:99px; padding:2px 8px; white-space:nowrap}
+.pd-wrap{max-width:820px; margin:0 auto; padding:14px 16px 60px}
+.pd-back{display:inline-block; font-size:13px; margin-bottom:10px; text-decoration:none}
+.pd-head h1{font-size:21px; margin-bottom:2px}
+.pd-evt{font-size:13px; background:#eef7f1; border-radius:8px; padding:7px 10px; margin-top:8px}
+.pd-meta{display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap}
+.desc-body{background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:18px 20px; margin-top:14px; line-height:1.65; font-size:14.5px}
+.desc-body h2{font-size:18px; margin:14px 0 6px}
+.desc-body h3{font-size:15.5px; margin:12px 0 5px}
+.desc-body h4{font-size:14px; margin:10px 0 4px}
+.desc-body p{margin:6px 0}
+.desc-body ul{margin:6px 0 6px 22px}
+.gl-term{border-bottom:1.5px dashed var(--accent); cursor:pointer}
+.gl-term:hover{background:#e8f0fe}
+.pd-editor{margin-top:14px}
+.pd-editor label{display:block; font-size:11.5px; font-weight:700; color:var(--muted);
+  margin:12px 0 4px; text-transform:uppercase; letter-spacing:.05em}
+.pd-editor textarea{width:100%; border:1.5px solid var(--line); border-radius:10px;
+  padding:10px 12px; font-family:ui-monospace,Consolas,monospace; font-size:13.5px; line-height:1.5}
+.pd-editor textarea:focus{outline:none; border-color:var(--accent)}
+.pd-editor .btns{margin-top:12px}
+.pd-preview{margin-top:16px; border-top:2px dashed var(--line); padding-top:8px}
+
 /* ── modal ────────────────────────────────────────────────── */
 .overlay{position:fixed; inset:0; background:rgba(15,20,30,.45); display:flex;
   align-items:center; justify-content:center; z-index:100; padding:16px}
