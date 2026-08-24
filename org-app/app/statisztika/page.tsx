@@ -154,22 +154,40 @@ function ProgressTab() {
                 </span>
               </div>
 
-              {pctFull != null && (
-                <>
-                  <div className="prog-bar">
-                    <div className={"prog-fill" + (beat ? " beat" : "")}
-                         style={{ width: Math.min(100, pctFull) + "%" }} />
-                  </div>
-                  <div className="prog-foot">
-                    {beat
-                      ? <b className="prog-beat">🎉 {t("prog_beat")} (+{fmtMoney(r.cur - r.prev_full)})</b>
-                      : <>
-                          <b>{pctFull}%</b> {t("prog_of_full")} ({fmtMoney(r.prev_full)}) ·{" "}
-                          {t("prog_left")}: <b>{fmtMoney(r.prev_full - r.cur)}</b>
-                        </>}
-                  </div>
-                </>
-              )}
+              {pctFull != null && (() => {
+                const scale = Math.max(r.cur, r.prev_full, 1);
+                const fillPct = (r.cur / scale) * 100;
+                const markerPct = (r.prev_full / scale) * 100;
+                const greenPct = Math.min(fillPct, markerPct);
+                const goldPct = Math.max(0, fillPct - markerPct);
+                return (
+                  <>
+                    <div className="prog-bar">
+                      <div className="prog-fill" style={{ width: greenPct + "%" }} />
+                      {goldPct > 0 && (
+                        <div className="prog-fill beat"
+                             style={{ left: markerPct + "%", width: goldPct + "%" }} />
+                      )}
+                      <div className="prog-marker" style={{ left: markerPct + "%" }}
+                           title={`${t("prog_of_full")}: ${fmtMoney(r.prev_full)}`} />
+                    </div>
+                    <div className="prog-scale">
+                      <span>0</span>
+                      <span style={{ position: "absolute", left: markerPct + "%", transform: "translateX(-50%)" }}>
+                        ⯆ {fmtShort(r.prev_full)}
+                      </span>
+                    </div>
+                    <div className="prog-foot">
+                      {beat
+                        ? <b className="prog-beat">🎉 {t("prog_beat")} — túlhaladás: +{fmtMoney(r.cur - r.prev_full)} ({pctFull - 100}%)</b>
+                        : <>
+                            <b>{pctFull}%</b> {t("prog_of_full")} ({fmtMoney(r.prev_full)}) ·{" "}
+                            {t("prog_left")}: <b>{fmtMoney(r.prev_full - r.cur)}</b>
+                          </>}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           );
         })}

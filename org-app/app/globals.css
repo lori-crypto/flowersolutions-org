@@ -383,10 +383,15 @@ body.editing .hint{display:block}
 .prog-pct{font-size:19px; font-weight:800; border-radius:10px; padding:3px 10px}
 .prog-pct.pos{background:#e6f4ea; color:#1d5a33}
 .prog-pct.neg{background:#fbeae7; color:var(--empty)}
-.prog-bar{height:14px; border-radius:99px; background:#e8ebef; overflow:hidden}
-.prog-fill{height:100%; border-radius:99px; background:linear-gradient(90deg,#3a9663,#2f7a4f);
-  transition:width .6s ease}
-.prog-fill.beat{background:linear-gradient(90deg,#f5b301,#f59e0b)}
+.prog-bar{height:14px; border-radius:99px; background:#e8ebef; position:relative; overflow:visible}
+.prog-fill{position:absolute; left:0; top:0; height:100%; border-radius:99px;
+  background:linear-gradient(90deg,#3a9663,#2f7a4f); transition:width .6s ease}
+.prog-fill.beat{border-radius:0 99px 99px 0;
+  background:linear-gradient(90deg,#f5b301,#f59e0b)}
+.prog-marker{position:absolute; top:-4px; bottom:-4px; width:2.5px; background:#1c2430;
+  border-radius:2px; z-index:2}
+.prog-scale{position:relative; height:16px; font-size:10px; color:var(--muted);
+  margin-top:2px; white-space:nowrap}
 .prog-foot{font-size:12.5px; color:var(--muted); margin-top:7px}
 .prog-foot b{color:var(--ink)}
 .prog-beat{color:#8a5a00}
