@@ -13,11 +13,12 @@ const fail = (e: { message?: string } | null) => { if (e) throw new Error(e.mess
 
 export async function statSales(p: {
   from: string; to: string; dim: string;
-  client?: string; grupa?: string; q?: string;
+  client?: string; grupa?: string; q?: string; inv?: boolean;
 }): Promise<StatRow[]> {
   const { data, error } = await supabase.rpc("app_stat_sales", {
     p_from: p.from, p_to: p.to, p_dim: p.dim,
     p_client: p.client || null, p_grupa: p.grupa || null, p_q: p.q || null,
+    p_inv: !!p.inv,
   });
   fail(error);
   return ((data as StatRow[]) ?? []).map(r => ({
@@ -37,6 +38,18 @@ export async function statCompare(from: string, to: string): Promise<CompareRow[
     nexus_net: Number(r.nexus_net) || 0,
     nexus_gross: Number(r.nexus_gross) || 0,
   }));
+}
+
+export async function statOptions(): Promise<{ clients: string[]; grupak: string[] }> {
+  const { data, error } = await supabase.rpc("app_stat_options");
+  fail(error);
+  const rows = (data as { kind: string; label: string }[]) ?? [];
+  return {
+    clients: rows.filter(r => r.kind === "client").map(r => r.label)
+      .sort((a, b) => a.localeCompare(b, "hu")),
+    grupak: rows.filter(r => r.kind === "grupa").map(r => r.label)
+      .sort((a, b) => a.localeCompare(b, "hu")),
+  };
 }
 
 export async function getCycles(): Promise<string[]> {

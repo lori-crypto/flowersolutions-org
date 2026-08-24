@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { StatRow, CompareRow, statSales, statCompare, getCycles } from "@/lib/stats";
+import { StatRow, CompareRow, statSales, statCompare, statOptions, getCycles } from "@/lib/stats";
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -116,27 +116,24 @@ function SalesTab() {
     setLoading(true); setErr("");
     try {
       const [r, tot] = await Promise.all([
-        withAuthRetry(() => statSales({ from, to, dim, client, grupa, q })),
-        withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q })),
+        withAuthRetry(() => statSales({ from, to, dim, client, grupa, q, inv: measure === "invoices" })),
+        withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q, inv: true })),
       ]);
       setRows(r);
       setTotal(tot[0] ?? null);
     } catch (e) { setErr((e as Error).message); }
     setLoading(false);
-  }, [from, to, dim, client, grupa, q]);
+  }, [from, to, dim, client, grupa, q, measure]);
 
   useEffect(() => { load(); }, [load]);
 
-  // szűrő-opciók (egyszer, a teljes időszakra)
+  // szűrő-opciók (könnyű lekérdezés, egyszer)
   useEffect(() => {
     (async () => {
       try {
-        const [cs, gs] = await Promise.all([
-          withAuthRetry(() => statSales({ from: "2024-01-01", to: iso(new Date()), dim: "client" })),
-          withAuthRetry(() => statSales({ from: "2024-01-01", to: iso(new Date()), dim: "grupa" })),
-        ]);
-        setClientOpts(cs.map(x => x.label).sort((a, b) => a.localeCompare(b, "hu")));
-        setGrupaOpts(gs.map(x => x.label).sort((a, b) => a.localeCompare(b, "hu")));
+        const o = await withAuthRetry(() => statOptions());
+        setClientOpts(o.clients);
+        setGrupaOpts(o.grupak);
       } catch { /* opciók nélkül is működik */ }
     })();
   }, []);
