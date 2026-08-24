@@ -58,7 +58,7 @@ export default function StatisztikaPage() {
     setSyncBusy(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Nincs bejelentkezés.");
+      if (!session) throw new Error("Nincs bejelentkezés. / Nu ești autentificat.");
       const r = await fetch("/api/sync-now", {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -224,7 +224,7 @@ function ProgressTab() {
                     </div>
                     <div className="prog-foot">
                       {beat
-                        ? <b className="prog-beat">🎉 {t("prog_beat")} — túlhaladás: +{fmtMoney(r.cur - r.prev_full)} ({pctFull - 100}%)</b>
+                        ? <b className="prog-beat">🎉 {t("prog_beat")} — {t("prog_overrun")}: +{fmtMoney(r.cur - r.prev_full)} ({pctFull - 100}%)</b>
                         : <>
                             <b>{pctFull}%</b> {t("prog_of_full")} ({fmtMoney(r.prev_full)}) ·{" "}
                             {t("prog_left")}: <b>{fmtMoney(r.prev_full - r.cur)}</b>

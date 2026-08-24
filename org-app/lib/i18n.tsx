@@ -209,6 +209,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   prog_of_full:     { hu: "a tavalyi teljesből", ro: "din totalul de anul trecut" },
   prog_left:        { hu: "a rekordig", ro: "până la record" },
   prog_beat:        { hu: "Tavalyi teljes túlszárnyalva!", ro: "Recordul de anul trecut depășit!" },
+  prog_overrun:     { hu: "túlhaladás", ro: "depășire" },
   prog_orders:      { hu: "Előrendelések a köv. szállításra (bruttó)", ro: "Precomenzi pentru următoarea livrare (brut)" },
   prog_vs_week_full:{ hu: "a tavalyi teljes hét", ro: "săptămâna completă de anul trecut" },
   prog_vs_orders:   { hu: "tavalyi megfelelő szállítás végleges rendelés-állománya", ro: "comenzile finale ale livrării corespunzătoare de anul trecut" },
