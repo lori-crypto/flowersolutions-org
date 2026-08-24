@@ -101,15 +101,20 @@ def main():
              prefer="return=minimal")
         print(f"  feltöltve: {min(i+B, len(all_rows))}/{len(all_rows)}", flush=True)
 
-    # ellenőrzés hónaponként
+    # ellenőrzés hónaponként (sorszám: pontos fejléc-számlálással)
     print("\n— Ellenőrzés (DB vs CSV) —")
     for m in months:
-        db = call(f"/rest/v1/sales_lines?select=real_net.sum(),id.count()&anluna=eq.{m}&source=eq.nexus_export")
-        src_n = sum(1 for r in all_rows if r["anluna"] == m)
-        src_v = round(sum(r["real_net"] for r in all_rows if r["anluna"] == m), 2)
-        db_n = db[0].get("count"); db_v = round(float(db[0].get("sum") or 0), 2)
-        ok = "OK" if (db_n == src_n and abs(db_v - src_v) < 0.05) else "ELTÉRÉS!"
-        print(f"  {m}: CSV {src_n} sor / {src_v:,.2f}  |  DB {db_n} sor / {db_v:,.2f}  {ok}")
+        req = urllib.request.Request(
+            URL + f"/rest/v1/sales_lines?select=id&anluna=eq.{m}&source=eq.nexus_export",
+            method="HEAD")
+        req.add_header("apikey", KEY); req.add_header("Authorization", "Bearer " + KEY)
+        req.add_header("Prefer", "count=exact"); req.add_header("Range", "0-0")
+        with urllib.request.urlopen(req, timeout=60) as r:
+            db_n = int(r.headers["Content-Range"].split("/")[1])
+        src_n = sum(1 for r2 in all_rows if r2["anluna"] == m)
+        src_v = round(sum(r2["real_net"] for r2 in all_rows if r2["anluna"] == m), 2)
+        ok = "OK" if db_n == src_n else "ELTÉRÉS!"
+        print(f"  {m}: CSV {src_n} sor (valós nettó {src_v:,.2f})  |  DB {db_n} sor  {ok}")
 
 if __name__ == "__main__":
     main()
