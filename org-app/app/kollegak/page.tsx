@@ -67,6 +67,7 @@ export default function KollegakPage() {
           <Link href="/szabadsag">{t("nav_leave")}</Link>
           <Link href="/kollegak" className="active">{t("nav_people")}</Link>
           <Link href="/posztleirasok">{t("nav_desc")}</Link>
+          <Link href="/statisztika">{t("nav_stat")}</Link>
         </nav>
         <span className="sp" />
         <button className="lang-btn" title="Frissítés" onClick={() => window.location.reload()}>↻</button>

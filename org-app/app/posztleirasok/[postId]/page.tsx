@@ -101,6 +101,7 @@ export default function PosztleirasDetailPage() {
           <Link href="/szabadsag">{t("nav_leave")}</Link>
           <Link href="/kollegak">{t("nav_people")}</Link>
           <Link href="/posztleirasok" className="active">{t("nav_desc")}</Link>
+          <Link href="/statisztika">{t("nav_stat")}</Link>
         </nav>
         <span className="sp" />
         <select className="lang-select" value={lang}
