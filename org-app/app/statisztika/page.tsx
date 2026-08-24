@@ -18,22 +18,34 @@ const fmtShort = (n: number) => {
   return Math.round(n).toLocaleString("hu-HU");
 };
 const YEAR_PALETTE = ["#2f7a4f", "#3b82f6", "#9ca3af", "#f59e0b", "#8b5cf6"];
-const HONAPOK = ["jan", "febr", "márc", "ápr", "máj", "jún", "júl", "aug", "szept", "okt", "nov", "dec"];
+const HONAPOK: Record<"hu" | "ro", string[]> = {
+  hu: ["jan", "febr", "márc", "ápr", "máj", "jún", "júl", "aug", "szept", "okt", "nov", "dec"],
+  ro: ["ian", "feb", "mar", "apr", "mai", "iun", "iul", "aug", "sept", "oct", "nov", "dec"],
+};
 const PIE_COLORS = ["#2f7a4f", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6",
   "#ec4899", "#84cc16", "#6366f1", "#f97316", "#06b6d4", "#a855f7"];
 
 const DIMS = [
-  { k: "day", l: "Nap" }, { k: "month", l: "Hónap" }, { k: "year", l: "Év" },
-  { k: "client", l: "Ügyfél" },
-  { k: "grupa", l: "Termékcsoport" }, { k: "clasa", l: "Osztály (clasa)" },
-  { k: "subclasa", l: "Alosztály (subclasa)" }, { k: "product", l: "Termék" },
+  { k: "day", hu: "Nap", ro: "Zi" }, { k: "month", hu: "Hónap", ro: "Lună" },
+  { k: "year", hu: "Év", ro: "An" },
+  { k: "client", hu: "Ügyfél", ro: "Client" },
+  { k: "grupa", hu: "Termékcsoport", ro: "Grupă de produse" },
+  { k: "clasa", hu: "Osztály (clasa)", ro: "Clasă (clasa)" },
+  { k: "subclasa", hu: "Alosztály (subclasa)", ro: "Subclasă (subclasa)" },
+  { k: "product", hu: "Termék", ro: "Produs" },
 ];
 const MEASURES = [
-  { k: "net", l: "Nettó (RON)" }, { k: "gross", l: "Bruttó (RON)" },
-  { k: "qty", l: "Mennyiség (db)" }, { k: "invoices", l: "Számlaszám" },
-  { k: "margin", l: "Árrés (RON)*" },
+  { k: "net", hu: "Nettó (RON)", ro: "Net (RON)" },
+  { k: "gross", hu: "Bruttó (RON)", ro: "Brut (RON)" },
+  { k: "qty", hu: "Mennyiség (db)", ro: "Cantitate (buc)" },
+  { k: "invoices", hu: "Számlaszám", ro: "Nr. facturi" },
+  { k: "margin", hu: "Árrés (RON)*", ro: "Marjă (RON)*" },
 ];
-const TYPES = [{ k: "line", l: "📈 Vonal" }, { k: "bar", l: "📊 Oszlop" }, { k: "pie", l: "🥧 Kör" }];
+const TYPES = [
+  { k: "line", hu: "📈 Vonal", ro: "📈 Linie" },
+  { k: "bar", hu: "📊 Oszlop", ro: "📊 Coloane" },
+  { k: "pie", hu: "🥧 Kör", ro: "🥧 Circular" },
+];
 
 export default function StatisztikaPage() {
   const { t, lang, setLang } = useI18n();
@@ -207,7 +219,8 @@ function ProgressTab() {
 
 /* ══════════ ELADÁSOK (BI) ══════════ */
 function SalesTab() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const months = HONAPOK[lang] ?? HONAPOK.hu;
   const now = new Date();
   const [from, setFrom] = useState(`${now.getFullYear()}-01-01`);
   const [to, setTo] = useState(iso(now));
@@ -268,8 +281,8 @@ function SalesTab() {
 
   const isMoney = measure !== "qty" && measure !== "invoices";
   const fmtVal = (v: number) => (isMoney ? fmtMoney(v) : fmtInt(v));
-  const dimLabel = DIMS.find(d => d.k === dim)?.l ?? "";
-  const measureLabel = MEASURES.find(m => m.k === measure)?.l ?? "";
+  const dimLabel = DIMS.find(d => d.k === dim)?.[lang] ?? "";
+  const measureLabel = MEASURES.find(m => m.k === measure)?.[lang] ?? "";
 
   // év/év sorozatok (hónap dimenziónál): év → 12 havi érték
   const yoySeries = useMemo(() => {
@@ -318,7 +331,7 @@ function SalesTab() {
     <div className="stat-wrap">
       {/* szűrők */}
       <div className="stat-card stat-filters">
-        <div><label>Év</label>
+        <div><label>{lang === "ro" ? "An" : "Év"}</label>
           <div style={{ display: "flex", gap: 4 }}>
             {Array.from({ length: now.getFullYear() - 2023 }, (_, i) => 2024 + i).map(y => {
               const yf = `${y}-01-01`;
@@ -332,7 +345,7 @@ function SalesTab() {
             })}
             <button className={"bchip" + (from === "2024-01-01" && to === iso(now) ? " on" : "")}
                     style={{ padding: "5px 10px" }}
-                    onClick={() => { setFrom("2024-01-01"); setTo(iso(now)); }}>Mind</button>
+                    onClick={() => { setFrom("2024-01-01"); setTo(iso(now)); }}>{lang === "ro" ? "Toate" : "Mind"}</button>
           </div>
         </div>
         <div><label>{t("f_from")}</label>
@@ -391,15 +404,15 @@ function SalesTab() {
         <div className="stat-filters" style={{ marginBottom: 10 }}>
           <div><label>{t("stat_dim")}</label>
             <select value={dim} onChange={e => setDim(e.target.value)}>
-              {DIMS.map(d => <option key={d.k} value={d.k}>{d.l}</option>)}
+              {DIMS.map(d => <option key={d.k} value={d.k}>{d[lang]}</option>)}
             </select></div>
           <div><label>{t("stat_measure")}</label>
             <select value={measure} onChange={e => setMeasure(e.target.value)}>
-              {MEASURES.map(m => <option key={m.k} value={m.k}>{m.l}</option>)}
+              {MEASURES.map(m => <option key={m.k} value={m.k}>{m[lang]}</option>)}
             </select></div>
           <div><label>{t("stat_type")}</label>
             <select value={ctype} onChange={e => setCtype(e.target.value)}>
-              {TYPES.map(x => <option key={x.k} value={x.k}>{x.l}</option>)}
+              {TYPES.map(x => <option key={x.k} value={x.k}>{x[lang]}</option>)}
             </select></div>
           <span className="muted" style={{ marginLeft: "auto", fontSize: 12, alignSelf: "center" }}>
             {measureLabel} · {dimLabel}{dim !== "day" && dim !== "month" ? " (top 30)" : ""}
@@ -408,7 +421,7 @@ function SalesTab() {
         {measure === "margin" && (
           <div className="fhint" style={{ marginBottom: 8 }}>{t("stat_margin_note")}</div>
         )}
-        {yoy ? <GroupedBarChart cats={HONAPOK} series={yoySeries} />
+        {yoy ? <GroupedBarChart cats={months} series={yoySeries} />
          : clientPivot ? <GroupedBarChart cats={clientPivot.cats} series={clientPivot.series} catAngle={-32} />
          : dim === "year" && ctype !== "pie" ? <YearChart data={chartData} fmtVal={fmtVal} />
          : <Chart data={chartData} type={ctype} fmtVal={fmtVal} />}
@@ -426,14 +439,14 @@ function SalesTab() {
           {yoy ? (
             <table className="stat-table">
               <thead><tr>
-                <th>Hónap</th>
+                <th>{DIMS.find(d => d.k === "month")?.[lang]}</th>
                 {yoySeries.map(s => (
                   <th key={s.name} style={{ textAlign: "right", color: s.color }}>{s.name}</th>
                 ))}
                 <th style={{ textAlign: "right" }}>Δ% ({yoySeries[yoySeries.length - 2]?.name}→{yoySeries[yoySeries.length - 1]?.name})</th>
               </tr></thead>
               <tbody>
-                {HONAPOK.map((hn, mi) => {
+                {months.map((hn, mi) => {
                   const prev = yoySeries[yoySeries.length - 2]?.vals[mi];
                   const cur = yoySeries[yoySeries.length - 1]?.vals[mi];
                   const pct = prev && cur != null ? Math.round(((cur - prev) / prev) * 100) : null;
@@ -969,7 +982,7 @@ function Chart({ data, type, fmtVal }: {
 function printTable(rows: { label: string; value: number }[], dimLabel: string,
                     measureLabel: string, fmtVal: (v: number) => string) {
   const w = window.open("", "_blank");
-  if (!w) { alert("Engedélyezd a felugró ablakot."); return; }
+  if (!w) { alert("Engedélyezd a felugró ablakot. / Permite fereastra pop-up."); return; }
   const esc = (s: string) => (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const body = rows.map(r =>
     `<tr><td>${esc(r.label)}</td><td style="text-align:right">${esc(fmtVal(r.value))}</td></tr>`).join("");
