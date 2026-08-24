@@ -493,6 +493,7 @@ body.editing .hint{display:block}
     overscroll-behavior-x:contain}
   .topnav::-webkit-scrollbar{display:none}
   .topnav a{white-space:nowrap; font-size:13px; padding:6px 11px; flex:0 0 auto}
+  .sync-label{display:none} /* fejlécben csak a ⇅ ikon fér el telefonon */
 
   /* fül-/táblaválasztó chipek: egy csúsztatható sor */
   .leave-toolbar{padding-left:10px; padding-right:10px}

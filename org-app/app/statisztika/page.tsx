@@ -96,6 +96,12 @@ export default function StatisztikaPage() {
           <Link href="/statisztika" className="active">{t("nav_stat")}</Link>
         </nav>
         <span className="sp" />
+        {isHr && (
+          <button className="lang-btn" disabled={syncBusy} onClick={syncNow}
+                  title={t("sync_hint")}>
+            {syncBusy ? "⏳" : "⇅"}<span className="sync-label"> {syncBusy ? t("sync_running") : t("sync_now")}</span>
+          </button>
+        )}
         <button className="lang-btn" onClick={() => window.location.reload()}>↻</button>
         <select className="lang-select" value={lang}
                 onChange={e => setLang(e.target.value as "hu" | "ro")}>
@@ -118,11 +124,6 @@ export default function StatisztikaPage() {
               <button className={"bchip" + (tab === "compare" ? " on" : "")}
                       onClick={() => setTab("compare")}>{t("stat_tab_compare")}</button>
             </div>
-            <span className="sp" style={{ flex: 1 }} />
-            <button className="mini-btn" disabled={syncBusy} onClick={syncNow}
-                    title={t("sync_hint")}>
-              ⟳ {syncBusy ? t("sync_running") : t("sync_now")}
-            </button>
           </div>
           {tab === "haladas" ? <ProgressTab /> : tab === "elado" ? <SalesTab /> : <CompareTab />}
         </>
