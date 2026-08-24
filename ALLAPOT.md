@@ -66,6 +66,15 @@ Utolsó frissítés: 2026-08-19
   Tanulságok: az API kedvezménye KÜLÖN negatív sor (procent_discount csak infó),
   ÁFA a cota_tva_ies mezőből (21%), érték = mennyiség × egységár.
 
+- ✅ **Webshop-előrendelés szinkron ÉL** (2026-08-24): `/api/webshop-sync` + cron
+  1:40 UTC → webshop_order_lines (14 569 sor, 98% nexus_id_client-tel) +
+  webshop_cycles; sales_lines.id_client feltöltve a NEXUS-fejekből.
+  Terv: `TERV_statisztika_bi_atvetel.md` (döntések: éjszakai elég, párhuzamos
+  futás a webshoppal, compare kezdőhét 2026-07-22).
+  **Teendő: WEBSHOP_SUPABASE_URL + WEBSHOP_SERVICE_KEY env a Vercelen** (a
+  helyi org-app/.env.local-ban megvannak), különben az éjszakai cron nem fut.
+  **Következik: a BI/Statisztika felület megtervezése és megépítése.**
+
 ## Későbbi modulok
 
 Pénzügy (NEXUS-szinkron), Projekt, HR, Irányelvek — lásd `TECHNIKAI_TERV.md`.
