@@ -590,7 +590,7 @@ function CompareTab() {
 
       {/* vonaldiagram — 4 kapcsolható sorozat */}
       <div className="stat-card">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+        <div className="cmp-toggles">
           <b style={{ fontSize: 14 }}>{t("cmp_chart_title")}</b>
           <button className={"serie-btn order" + (sOrder ? " on" : "")}
                   onClick={() => setSOrder(v => !v)}>● {t("cmp_order")}</button>
