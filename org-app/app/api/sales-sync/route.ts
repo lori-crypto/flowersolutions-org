@@ -104,9 +104,16 @@ export async function GET(req: NextRequest) {
       const h = byId.get(String(l["id_document"]))!;
       const cod = String(first(l["cod_extern_produs"], l["cod_produs"]) ?? "").trim();
       const p = prodMap.get(cod);
-      const net = num(first(l["valoare_fara_tva"], l["valoare"]));
-      const grossRaw = first(l["valoare_cu_tva"]);
-      const gross = grossRaw !== undefined ? num(grossRaw) : Math.round(net * 1.19 * 100) / 100;
+      const q = num(l["cantitate"]);
+      const puNet = num(first(l["pret_vanzare"], l["pret_unitar"], l["pret"], l["pret_fara_tva"]));
+      const puGross = num(first(l["pret_vanzare_tva"]));
+      const cota = num(first(l["cota_tva_ies"], l["cota_tva"])) || 21;
+      // FONTOS: a kedvezmény külön (negatív) sorként érkezik — a procent_discount
+      // csak tájékoztató, NEM szabad újra alkalmazni!
+      const r2 = (x: number) => Math.round(x * 100) / 100;
+      const net = l["valoare_fara_tva"] != null ? num(l["valoare_fara_tva"]) : r2(q * puNet);
+      const gross = l["valoare_cu_tva"] != null ? num(l["valoare_cu_tva"])
+        : puGross ? r2(q * puGross) : r2(net * (1 + cota / 100));
       const dataDoc = String(h["data_document"] ?? "").slice(0, 10);
       return {
         source: "nexus_api",
@@ -124,8 +131,8 @@ export async function GET(req: NextRequest) {
         clasa: p ? String(p["den_clasa"] ?? "").trim() || null : null,
         subclasa: p ? String(first(p["den_subclasa"], p["den_sub_clasa"]) ?? "").trim() || null : null,
         um: String(first(l["den_um"], l["um"]) ?? "").trim() || null,
-        cantitate: num(l["cantitate"]),
-        pu: null, puv: num(first(l["pret_vanzare"], l["pret_unitar"], l["pret"], l["pret_fara_tva"])),
+        cantitate: q,
+        pu: null, puv: puNet,
         val_pu: null,
         val_puv: net, val_disc: 0, val_tva: Math.round((gross - net) * 100) / 100,
         val_puv_tva: gross,
