@@ -1,7 +1,7 @@
 {
   "crons": [
     { "path": "/api/sales-sync", "schedule": "20 1 * * *" },
-    { "path": "/api/webshop-sync", "schedule": "40 1 * * *" },
+    { "path": "/api/webshop-sync", "schedule": "45 */2 * * *" },
     { "path": "/api/orders-sync", "schedule": "15 */2 * * *" }
   ]
 }

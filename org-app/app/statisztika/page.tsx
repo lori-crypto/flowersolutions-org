@@ -52,6 +52,25 @@ export default function StatisztikaPage() {
   const router = useRouter();
   const [isHr, setIsHr] = useState<boolean | null>(null);
   const [tab, setTab] = useState<"haladas" | "elado" | "compare">("haladas");
+  const [syncBusy, setSyncBusy] = useState(false);
+
+  async function syncNow() {
+    setSyncBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Nincs bejelentkezés.");
+      const r = await fetch("/api/sync-now", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Szinkron hiba");
+      window.location.reload();
+    } catch (e) {
+      alert((e as Error).message);
+      setSyncBusy(false);
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -99,6 +118,11 @@ export default function StatisztikaPage() {
               <button className={"bchip" + (tab === "compare" ? " on" : "")}
                       onClick={() => setTab("compare")}>{t("stat_tab_compare")}</button>
             </div>
+            <span className="sp" style={{ flex: 1 }} />
+            <button className="mini-btn" disabled={syncBusy} onClick={syncNow}
+                    title={t("sync_hint")}>
+              ⟳ {syncBusy ? t("sync_running") : t("sync_now")}
+            </button>
           </div>
           {tab === "haladas" ? <ProgressTab /> : tab === "elado" ? <SalesTab /> : <CompareTab />}
         </>
