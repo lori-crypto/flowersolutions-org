@@ -369,6 +369,9 @@ body.editing .hint{display:block}
   .week-head{gap:8px}
 }
 
+.cmp-scroll{overflow-x:auto}
+.cmp-table-scroll{overflow-x:auto}
+
 /* ── compare sorozat-kapcsolók ────────────────────────────── */
 .serie-btn{border:1.5px solid var(--line); background:#fff; border-radius:99px;
   padding:4px 12px; font-size:12.5px; font-weight:700; cursor:pointer; color:var(--muted);
@@ -475,4 +478,40 @@ body.editing .hint{display:block}
   .appbar{padding:8px 12px; gap:8px}
   .appbar .t{font-size:14px}
   .lang-btn{padding:5px 10px}
+}
+
+/* ── telefon: fejléc + statisztika ────────────────────────── */
+@media (max-width:700px){
+  /* fejléc: cím + gombok felül, a menü alatta egy csúsztatható sorban */
+  .appbar{padding:8px 10px 0; gap:6px}
+  .appbar .t{font-size:14.5px}
+  .lang-btn{padding:4px 8px; font-size:11.5px}
+  .lang-select{padding:4px 5px; font-size:11.5px}
+  .topnav{order:10; width:100%; margin:0 -10px; padding:2px 10px 8px;
+    flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;
+    overscroll-behavior-x:contain}
+  .topnav::-webkit-scrollbar{display:none}
+  .topnav a{white-space:nowrap; font-size:13px; padding:6px 11px; flex:0 0 auto}
+
+  /* fül-/táblaválasztó chipek: egy csúsztatható sor */
+  .leave-toolbar{padding-left:10px; padding-right:10px}
+  .board-chips{flex-wrap:nowrap; overflow-x:auto; max-width:100%;
+    scrollbar-width:none; overscroll-behavior-x:contain; padding-bottom:2px}
+  .board-chips::-webkit-scrollbar{display:none}
+  .bchip{white-space:nowrap; flex:0 0 auto}
+
+  /* statisztika kártyák és compare nézet */
+  .stat-wrap{padding:10px 10px 60px; gap:10px}
+  .stat-card{padding:10px 11px}
+  .kpi-v{font-size:19px}
+  .prog-big{font-size:29px}
+  .serie-btn{font-size:11.5px; padding:4px 10px}
+  .stat-filters{gap:8px}
+  .stat-filters input, .stat-filters select{max-width:132px; font-size:12.5px}
+  .stat-table{font-size:12px}
+  .stat-table th{padding:6px 8px}
+  .stat-table td{padding:5px 8px}
+  /* a diagram és a széles táblázat oldalirányban görgethető, nem törpül el */
+  .cmp-scroll svg{min-width:740px}
+  .cmp-table-scroll .stat-table{min-width:660px}
 }

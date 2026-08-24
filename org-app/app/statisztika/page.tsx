@@ -602,13 +602,16 @@ function CompareTab() {
                   onClick={() => setSLyInv(v => !v)}>◌ {t("cmp_ly_inv")}</button>
           <span className="muted" style={{ fontSize: 12 }}>— {t("cmp_toggle")}</span>
         </div>
-        <CmpChart weeks={weeks} sOrder={sOrder} sInv={sInv} sLyOrder={sLyOrder} sLyInv={sLyInv} />
+        <div className="cmp-scroll">
+          <CmpChart weeks={weeks} sOrder={sOrder} sInv={sInv} sLyOrder={sLyOrder} sLyInv={sLyInv} />
+        </div>
       </div>
 
       <div className="fhint">{t("stat_compare_hint")} {t("cmp_ly_hint")}</div>
 
       {/* táblázat */}
       <div className="stat-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="cmp-table-scroll">
         <table className="stat-table">
           <thead><tr>
             <th>{t("cmp_week")}</th>
@@ -685,6 +688,7 @@ function CompareTab() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
