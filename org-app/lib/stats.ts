@@ -70,6 +70,23 @@ export async function statOptions(): Promise<{ clients: string[]; grupak: string
   };
 }
 
+export type CompareWeek = {
+  week: string; week_end: string; is_future: boolean;
+  cur_order: number; cur_gross: number; cur_net: number;
+  ly_from: string; ly_to: string; ly_order: number; ly_gross: number;
+};
+
+export async function statCompareWeeks(from: string, to: string): Promise<CompareWeek[]> {
+  const { data, error } = await supabase.rpc("app_stat_compare_weeks", { p_from: from, p_to: to });
+  fail(error);
+  return ((data as CompareWeek[]) ?? []).map(r => ({
+    ...r,
+    cur_order: Number(r.cur_order) || 0, cur_gross: Number(r.cur_gross) || 0,
+    cur_net: Number(r.cur_net) || 0, ly_order: Number(r.ly_order) || 0,
+    ly_gross: Number(r.ly_gross) || 0,
+  }));
+}
+
 export async function getCycles(): Promise<string[]> {
   const { data, error } = await supabase.from("webshop_cycles")
     .select("delivery_date").order("delivery_date");

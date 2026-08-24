@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { StatRow, CompareRow, ProgressRow, statSales, statCompare, statOptions, statProgress, getCycles } from "@/lib/stats";
+import { StatRow, CompareRow, CompareWeek, ProgressRow, statSales, statCompare, statCompareWeeks, statOptions, statProgress, getCycles } from "@/lib/stats";
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -512,17 +512,19 @@ function SalesTab() {
   );
 }
 
-/* ══════════ ELŐRENDELÉS vs SZÁMLÁZOTT ══════════ */
+/* ══════════ ELŐRENDELÉS vs SZÁMLÁZOTT (idei + tavalyi sorozatok) ══════════ */
 function CompareTab() {
   const { t } = useI18n();
   const now = new Date();
   const [from, setFrom] = useState("2026-07-22");
   const [to, setTo] = useState(iso(now));
-  const [rows, setRows] = useState<CompareRow[]>([]);
-  const [cycles, setCycles] = useState<string[]>([]);
+  const [weeks, setWeeks] = useState<CompareWeek[]>([]);
+  const [clientRows, setClientRows] = useState<CompareRow[]>([]);
   const [open, setOpen] = useState<string | null>(null);
-  const [showOrder, setShowOrder] = useState(true);
-  const [showInv, setShowInv] = useState(true);
+  const [sOrder, setSOrder] = useState(true);
+  const [sInv, setSInv] = useState(true);
+  const [sLyOrder, setSLyOrder] = useState(false);
+  const [sLyInv, setSLyInv] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -530,41 +532,33 @@ function CompareTab() {
     (async () => {
       setLoading(true); setErr("");
       try {
-        const [r, c] = await Promise.all([
+        const [w, cr] = await Promise.all([
+          withAuthRetry(() => statCompareWeeks(from, to)),
           withAuthRetry(() => statCompare(from, to)),
-          withAuthRetry(() => getCycles()),
         ]);
-        setRows(r); setCycles(c);
+        setWeeks(w); setClientRows(cr);
       } catch (e) { setErr((e as Error).message); }
       setLoading(false);
     })();
   }, [from, to]);
 
-  const weeks = useMemo(() => {
-    const m = new Map<string, { clients: CompareRow[]; order: number; net: number; gross: number }>();
-    for (const r of rows) {
-      let w = m.get(r.week);
-      if (!w) { w = { clients: [], order: 0, net: 0, gross: 0 }; m.set(r.week, w); }
-      w.clients.push(r);
-      w.order += r.order_ron; w.net += r.nexus_net; w.gross += r.nexus_gross;
+  const clientsByWeek = useMemo(() => {
+    const m = new Map<string, CompareRow[]>();
+    for (const r of clientRows) {
+      const arr = m.get(r.week) ?? []; arr.push(r); m.set(r.week, arr);
     }
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [rows]);
+    return m;
+  }, [clientRows]);
 
-  const weekEnd = (start: string): string => {
-    const i = cycles.indexOf(start);
-    if (i >= 0 && i < cycles.length - 1) {
-      const d = new Date(cycles[i + 1] + "T12:00:00");
-      d.setDate(d.getDate() - 1);
-      return iso(d);
-    }
-    return to;
-  };
   const shift = (days: number) => {
     const f = new Date(from + "T12:00:00"); f.setDate(f.getDate() + days);
     const t2 = new Date(to + "T12:00:00"); t2.setDate(t2.getDate() + days);
     setFrom(iso(f)); setTo(iso(t2));
   };
+  const fd = (d: string) =>
+    new Date(d + "T12:00:00").toLocaleDateString("hu-HU", { month: "short", day: "numeric" });
+
+  const anyLy = sLyOrder || sLyInv;
 
   return (
     <div className="stat-wrap">
@@ -581,46 +575,65 @@ function CompareTab() {
       </div>
       {err && <div className="leave-err">{err}</div>}
 
-      {/* vonaldiagram — ki/be kapcsolható sorozatok */}
+      {/* vonaldiagram — 4 kapcsolható sorozat */}
       <div className="stat-card">
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
           <b style={{ fontSize: 14 }}>{t("cmp_chart_title")}</b>
-          <button className={"serie-btn order" + (showOrder ? " on" : "")}
-                  onClick={() => setShowOrder(v => !v)}>● {t("cmp_order")}</button>
-          <button className={"serie-btn inv" + (showInv ? " on" : "")}
-                  onClick={() => setShowInv(v => !v)}>● {t("cmp_inv")}</button>
+          <button className={"serie-btn order" + (sOrder ? " on" : "")}
+                  onClick={() => setSOrder(v => !v)}>● {t("cmp_order")}</button>
+          <button className={"serie-btn inv" + (sInv ? " on" : "")}
+                  onClick={() => setSInv(v => !v)}>● {t("cmp_inv")}</button>
+          <button className={"serie-btn lyorder" + (sLyOrder ? " on" : "")}
+                  onClick={() => setSLyOrder(v => !v)}>◌ {t("cmp_ly_order")}</button>
+          <button className={"serie-btn lyinv" + (sLyInv ? " on" : "")}
+                  onClick={() => setSLyInv(v => !v)}>◌ {t("cmp_ly_inv")}</button>
           <span className="muted" style={{ fontSize: 12 }}>— {t("cmp_toggle")}</span>
         </div>
-        <CmpChart weeks={weeks} showOrder={showOrder} showInv={showInv} />
+        <CmpChart weeks={weeks} sOrder={sOrder} sInv={sInv} sLyOrder={sLyOrder} sLyInv={sLyInv} />
       </div>
 
-      <div className="fhint">{t("stat_compare_hint")}</div>
+      <div className="fhint">{t("stat_compare_hint")} {t("cmp_ly_hint")}</div>
 
-      {/* táblázat — bruttó/nettó/eltérés oszlopokkal, lenyitható ügyfél-bontással */}
+      {/* táblázat */}
       <div className="stat-card" style={{ padding: 0, overflow: "hidden" }}>
         <table className="stat-table">
           <thead><tr>
             <th>{t("cmp_week")}</th>
             <th style={{ textAlign: "right" }}>{t("cmp_order_col")}</th>
+            {sLyOrder && <th style={{ textAlign: "right", color: "#4a8a63" }}>{t("cmp_ly_order")}</th>}
             <th style={{ textAlign: "right" }}>{t("cmp_gross_col")}</th>
+            {sLyInv && <th style={{ textAlign: "right", color: "#6b76c9" }}>{t("cmp_ly_inv")}</th>}
             <th style={{ textAlign: "right" }}>{t("cmp_net_col")}</th>
             <th style={{ textAlign: "right" }}>{t("cmp_diff_col")}</th>
             <th style={{ textAlign: "right" }}>%</th>
           </tr></thead>
           <tbody>
-            {weeks.map(([wk, w]) => {
-              const diff = w.gross - w.order;
-              const pct = w.order > 0 ? (diff / w.order) * 100 : null;
-              const opened = open === wk;
+            {weeks.map(w => {
+              const diff = w.cur_gross - w.cur_order;
+              const pct = !w.is_future && w.cur_order > 0 ? (diff / w.cur_order) * 100 : null;
+              const opened = open === w.week;
+              const clients = clientsByWeek.get(w.week) ?? [];
               return [
-                <tr key={wk} onClick={() => setOpen(opened ? null : wk)} style={{ cursor: "pointer" }}>
-                  <td><b>{opened ? "▾" : "▸"} {wk} → {weekEnd(wk)}</b></td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtMoney(w.order)}</td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{fmtMoney(w.gross)}</td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{fmtMoney(w.net)}</td>
+                <tr key={w.week} onClick={() => setOpen(opened ? null : w.week)} style={{ cursor: "pointer" }}>
+                  <td>
+                    <b>{opened ? "▾" : "▸"} {w.week} → {w.week_end}</b>
+                    {w.is_future && <span className="acct-tag" style={{ marginLeft: 6 }}>{t("cmp_next_week")}</span>}
+                    {anyLy && <div className="muted" style={{ fontSize: 10.5 }}>
+                      {t("cmp_ly_short")}: {fd(w.ly_from)} – {fd(w.ly_to)}</div>}
+                  </td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                    {w.cur_order ? fmtMoney(w.cur_order) : "—"}</td>
+                  {sLyOrder && <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#4a8a63" }}>
+                    {w.ly_order ? fmtMoney(w.ly_order) : "—"}</td>}
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                    {w.is_future ? "—" : fmtMoney(w.cur_gross)}</td>
+                  {sLyInv && <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#6b76c9" }}>
+                    {w.ly_gross ? fmtMoney(w.ly_gross) : "—"}</td>}
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>
+                    {w.is_future ? "—" : fmtMoney(w.cur_net)}</td>
                   <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700,
                                color: diff >= 0 ? "#1a4fbc" : "var(--empty)" }}>
-                    {diff >= 0 ? "+" : ""}{fmtMoney(diff)}
+                    {w.is_future ? "—" : (diff >= 0 ? "+" : "") + fmtMoney(diff)}
                   </td>
                   <td style={{ textAlign: "right" }}>
                     {pct != null && (
@@ -630,11 +643,11 @@ function CompareTab() {
                     )}
                   </td>
                 </tr>,
-                opened ? (
-                  <tr key={wk + "-d"}><td colSpan={6} style={{ padding: 0, background: "#fafbfc" }}>
+                opened && clients.length > 0 ? (
+                  <tr key={w.week + "-d"}><td colSpan={8} style={{ padding: 0, background: "#fafbfc" }}>
                     <table className="stat-table" style={{ margin: 0 }}>
                       <tbody>
-                        {w.clients.sort((a, b) => b.nexus_gross - a.nexus_gross).map(c => {
+                        {clients.sort((a, b) => b.nexus_gross - a.nexus_gross).map(c => {
                           const cd = c.nexus_gross - c.order_ron;
                           return (
                             <tr key={c.client}>
@@ -645,7 +658,6 @@ function CompareTab() {
                               <td style={{ textAlign: "right", color: cd >= 0 ? "#1a4fbc" : "var(--empty)" }}>
                                 {cd >= 0 ? "+" : ""}{fmtMoney(cd)}
                               </td>
-                              <td />
                             </tr>
                           );
                         })}
@@ -656,7 +668,7 @@ function CompareTab() {
               ];
             })}
             {weeks.length === 0 && !loading && (
-              <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 20 }}>{t("stat_no_data")}</td></tr>
+              <tr><td colSpan={8} className="muted" style={{ textAlign: "center", padding: 20 }}>{t("stat_no_data")}</td></tr>
             )}
           </tbody>
         </table>
@@ -665,28 +677,44 @@ function CompareTab() {
   );
 }
 
-/* két-vonalas heti diagram */
-function CmpChart({ weeks, showOrder, showInv }: {
-  weeks: [string, { order: number; gross: number }][];
-  showOrder: boolean; showInv: boolean;
+/* négy-sorozatos heti diagram (idei folytonos, tavalyi szaggatott) */
+function CmpChart({ weeks, sOrder, sInv, sLyOrder, sLyInv }: {
+  weeks: CompareWeek[];
+  sOrder: boolean; sInv: boolean; sLyOrder: boolean; sLyInv: boolean;
 }) {
   if (!weeks.length) return <div style={{ height: 200, display: "grid", placeItems: "center", color: "var(--muted)" }}>—</div>;
-  const W = 1300, H = 360, padL = 80, padR = 20, padT = 16, padB = 64;
+  const W = 1300, H = 380, padL = 80, padR = 20, padT = 16, padB = 64;
   const iw = W - padL - padR, ih = H - padT - padB;
-  const vals: number[] = [];
-  for (const [, w] of weeks) {
-    if (showOrder) vals.push(w.order);
-    if (showInv) vals.push(w.gross);
-  }
+
+  type Serie = { color: string; dash?: string; pts: (number | null)[] };
+  const series: Serie[] = [];
+  if (sOrder) series.push({ color: "#2f7a4f",
+    pts: weeks.map(w => (w.cur_order > 0 ? w.cur_order : null)) });
+  if (sInv) series.push({ color: "#4757d8",
+    pts: weeks.map(w => (w.is_future ? null : w.cur_gross)) });
+  if (sLyOrder) series.push({ color: "#7fbf97", dash: "7 5",
+    pts: weeks.map(w => (w.ly_order > 0 ? w.ly_order : null)) });
+  if (sLyInv) series.push({ color: "#98a2e8", dash: "7 5",
+    pts: weeks.map(w => (w.ly_gross > 0 ? w.ly_gross : null)) });
+
+  const vals = series.flatMap(s => s.pts.filter((v): v is number => v != null));
   const max = Math.max(...vals, 1);
   const n = weeks.length;
   const xOf = (i: number) => padL + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
   const yOf = (v: number) => padT + ih - (v / max) * ih;
-  const series: { color: string; get: (w: { order: number; gross: number }) => number }[] = [];
-  if (showOrder) series.push({ color: "#2f7a4f", get: w => w.order });
-  if (showInv) series.push({ color: "#4757d8", get: w => w.gross });
+
+  const seg = (pts: (number | null)[]) => {
+    const parts: string[] = []; let cur: string[] = [];
+    pts.forEach((v, i) => {
+      if (v == null) { if (cur.length) { parts.push(cur.join(" ")); cur = []; } }
+      else cur.push(`${xOf(i)},${yOf(v)}`);
+    });
+    if (cur.length) parts.push(cur.join(" "));
+    return parts;
+  };
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 380 }}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 400 }}>
       {Array.from({ length: 5 }).map((_, i) => {
         const v = (max / 4) * i;
         const y = padT + ih - (i / 4) * ih;
@@ -699,18 +727,21 @@ function CmpChart({ weeks, showOrder, showInv }: {
       })}
       {series.map((s, si) => (
         <g key={si}>
-          <polyline fill="none" stroke={s.color} strokeWidth={2}
-                    points={weeks.map(([, w], i) => `${xOf(i)},${yOf(s.get(w))}`).join(" ")} />
-          {weeks.map(([wk, w], i) => (
-            <circle key={i} cx={xOf(i)} cy={yOf(s.get(w))} r={3.5} fill={s.color}>
-              <title>{wk}: {fmtMoney(s.get(w))}</title>
+          {seg(s.pts).map((pline, pi) => (
+            <polyline key={pi} fill="none" stroke={s.color} strokeWidth={2}
+                      strokeDasharray={s.dash} points={pline} />
+          ))}
+          {s.pts.map((v, i) => v == null ? null : (
+            <circle key={i} cx={xOf(i)} cy={yOf(v)} r={3.5} fill={s.color}>
+              <title>{weeks[i].week}: {fmtMoney(v)}</title>
             </circle>
           ))}
         </g>
       ))}
-      {weeks.map(([wk], i) => (
-        <text key={i} x={xOf(i)} y={H - padB + 18} fontSize={11} fill="#647686"
-              textAnchor="end" transform={`rotate(-35 ${xOf(i)} ${H - padB + 18})`}>{wk}</text>
+      {weeks.map((w, i) => (
+        <text key={i} x={xOf(i)} y={H - padB + 18} fontSize={11}
+              fill={w.is_future ? "#b58a1f" : "#647686"} fontWeight={w.is_future ? 700 : 400}
+              textAnchor="end" transform={`rotate(-35 ${xOf(i)} ${H - padB + 18})`}>{w.week}</text>
       ))}
     </svg>
   );
