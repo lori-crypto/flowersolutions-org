@@ -35,7 +35,7 @@ begin
   from sales_lines s
   where s.data_doc between p_from and p_to
     and s.tip_doc = 'Factura'
-    and (p_client is null or s.nume_cli = p_client)
+    and (p_client is null or s.nume_cli ilike '%' || p_client || '%')
     and (p_grupa is null or s.grupa = p_grupa)
     and (p_q is null or s.denumire ilike '%' || p_q || '%')
   group by 1

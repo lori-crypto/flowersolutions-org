@@ -183,11 +183,19 @@ function SalesTab() {
           <input type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
         <div><label>{t("f_to")}</label>
           <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></div>
-        <div><label>{t("stat_client")}</label>
-          <select value={client} onChange={e => setClient(e.target.value)}>
-            <option value="">{t("stat_all")}</option>
-            {clientOpts.map(c => <option key={c} value={c}>{c}</option>)}
-          </select></div>
+        <div style={{ position: "relative" }}><label>{t("stat_client")}</label>
+          <input type="text" list="stat-client-list" value={client}
+                 placeholder={"🔍 " + t("stat_all")}
+                 onChange={e => setClient(e.target.value)}
+                 style={{ paddingRight: 26 }} />
+          {client && (
+            <button onClick={() => setClient("")}
+                    style={{ position: "absolute", right: 6, bottom: 7, border: "none",
+                             background: "none", cursor: "pointer", color: "var(--muted)" }}>×</button>
+          )}
+          <datalist id="stat-client-list">
+            {clientOpts.map(c => <option key={c} value={c} />)}
+          </datalist></div>
         <div><label>{t("stat_grupa")}</label>
           <select value={grupa} onChange={e => setGrupa(e.target.value)}>
             <option value="">{t("stat_all")}</option>
