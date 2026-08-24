@@ -521,6 +521,8 @@ function CompareTab() {
   const [rows, setRows] = useState<CompareRow[]>([]);
   const [cycles, setCycles] = useState<string[]>([]);
   const [open, setOpen] = useState<string | null>(null);
+  const [showOrder, setShowOrder] = useState(true);
+  const [showInv, setShowInv] = useState(true);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -558,71 +560,159 @@ function CompareTab() {
     }
     return to;
   };
-  const diffPct = (order: number, net: number) =>
-    order > 0 ? Math.round(((net - order) / order) * 100) : null;
+  const shift = (days: number) => {
+    const f = new Date(from + "T12:00:00"); f.setDate(f.getDate() + days);
+    const t2 = new Date(to + "T12:00:00"); t2.setDate(t2.getDate() + days);
+    setFrom(iso(f)); setTo(iso(t2));
+  };
 
   return (
     <div className="stat-wrap">
       <div className="stat-card stat-filters">
+        <button className="mini-btn" onClick={() => shift(-28)}>‹</button>
         <div><label>{t("f_from")}</label>
-          <input type="date" value={from} min="2026-07-22" onChange={e => setFrom(e.target.value)} /></div>
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
         <div><label>{t("f_to")}</label>
           <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></div>
+        <button className="mini-btn" onClick={() => shift(28)}>›</button>
         <span className="muted" style={{ marginLeft: "auto", fontSize: 12, alignSelf: "center" }}>
           {loading ? t("loading") : `${weeks.length} ${t("stat_weeks")}`}
         </span>
       </div>
-      <div className="fhint">{t("stat_compare_hint")}</div>
       {err && <div className="leave-err">{err}</div>}
 
-      {weeks.map(([wk, w]) => {
-        const pct = diffPct(w.order, w.gross);
-        return (
-          <div className="stat-card" key={wk} style={{ padding: 0, overflow: "hidden" }}>
-            <button className="week-head" onClick={() => setOpen(open === wk ? null : wk)}>
-              <b>{wk} → {weekEnd(wk)}</b>
-              <span className="wh-cell">{t("stat_ordered")}: <b>{fmtMoney(w.order)}</b></span>
-              <span className="wh-cell">{t("stat_invoiced_net")}: <b>{fmtMoney(w.net)}</b></span>
-              <span className="wh-cell">{t("stat_invoiced_gross")}: <b>{fmtMoney(w.gross)}</b></span>
-              {pct != null && (
-                <span className={"pct-tag" + (pct >= 0 ? " pos" : " neg")}>
-                  {pct >= 0 ? "+" : ""}{pct}%
-                </span>
-              )}
-              <span className="muted">{open === wk ? "▴" : "▾"}</span>
-            </button>
-            {open === wk && (
-              <table className="stat-table">
-                <thead><tr>
-                  <th>{t("stat_client")}</th>
-                  <th style={{ textAlign: "right" }}>{t("stat_ordered")}</th>
-                  <th style={{ textAlign: "right" }}>{t("stat_invoiced_net")}</th>
-                  <th style={{ textAlign: "right" }}>{t("stat_invoiced_gross")}</th>
-                  <th style={{ textAlign: "right" }}>Δ%</th>
-                </tr></thead>
-                <tbody>
-                  {w.clients.sort((a, b) => b.nexus_net - a.nexus_net).map(c => {
-                    const p = diffPct(c.order_ron, c.nexus_gross);
-                    return (
-                      <tr key={c.client}>
-                        <td>{c.client}</td>
-                        <td style={{ textAlign: "right" }}>{c.order_ron ? fmtMoney(c.order_ron) : "—"}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{c.nexus_net ? fmtMoney(c.nexus_net) : "—"}</td>
-                        <td style={{ textAlign: "right" }}>{c.nexus_gross ? fmtMoney(c.nexus_gross) : "—"}</td>
-                        <td style={{ textAlign: "right" }}>
-                          {p != null ? <span className={"pct-tag" + (p >= 0 ? " pos" : " neg")}>{p >= 0 ? "+" : ""}{p}%</span> : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+      {/* vonaldiagram — ki/be kapcsolható sorozatok */}
+      <div className="stat-card">
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+          <b style={{ fontSize: 14 }}>{t("cmp_chart_title")}</b>
+          <button className={"serie-btn order" + (showOrder ? " on" : "")}
+                  onClick={() => setShowOrder(v => !v)}>● {t("cmp_order")}</button>
+          <button className={"serie-btn inv" + (showInv ? " on" : "")}
+                  onClick={() => setShowInv(v => !v)}>● {t("cmp_inv")}</button>
+          <span className="muted" style={{ fontSize: 12 }}>— {t("cmp_toggle")}</span>
+        </div>
+        <CmpChart weeks={weeks} showOrder={showOrder} showInv={showInv} />
+      </div>
+
+      <div className="fhint">{t("stat_compare_hint")}</div>
+
+      {/* táblázat — bruttó/nettó/eltérés oszlopokkal, lenyitható ügyfél-bontással */}
+      <div className="stat-card" style={{ padding: 0, overflow: "hidden" }}>
+        <table className="stat-table">
+          <thead><tr>
+            <th>{t("cmp_week")}</th>
+            <th style={{ textAlign: "right" }}>{t("cmp_order_col")}</th>
+            <th style={{ textAlign: "right" }}>{t("cmp_gross_col")}</th>
+            <th style={{ textAlign: "right" }}>{t("cmp_net_col")}</th>
+            <th style={{ textAlign: "right" }}>{t("cmp_diff_col")}</th>
+            <th style={{ textAlign: "right" }}>%</th>
+          </tr></thead>
+          <tbody>
+            {weeks.map(([wk, w]) => {
+              const diff = w.gross - w.order;
+              const pct = w.order > 0 ? (diff / w.order) * 100 : null;
+              const opened = open === wk;
+              return [
+                <tr key={wk} onClick={() => setOpen(opened ? null : wk)} style={{ cursor: "pointer" }}>
+                  <td><b>{opened ? "▾" : "▸"} {wk} → {weekEnd(wk)}</b></td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtMoney(w.order)}</td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{fmtMoney(w.gross)}</td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{fmtMoney(w.net)}</td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700,
+                               color: diff >= 0 ? "#1a4fbc" : "var(--empty)" }}>
+                    {diff >= 0 ? "+" : ""}{fmtMoney(diff)}
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    {pct != null && (
+                      <span className={"pct-tag" + (pct >= 0 ? " pos" : " neg")}>
+                        {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                      </span>
+                    )}
+                  </td>
+                </tr>,
+                opened ? (
+                  <tr key={wk + "-d"}><td colSpan={6} style={{ padding: 0, background: "#fafbfc" }}>
+                    <table className="stat-table" style={{ margin: 0 }}>
+                      <tbody>
+                        {w.clients.sort((a, b) => b.nexus_gross - a.nexus_gross).map(c => {
+                          const cd = c.nexus_gross - c.order_ron;
+                          return (
+                            <tr key={c.client}>
+                              <td style={{ paddingLeft: 34 }}>{c.client}</td>
+                              <td style={{ textAlign: "right" }}>{c.order_ron ? fmtMoney(c.order_ron) : "—"}</td>
+                              <td style={{ textAlign: "right", fontWeight: 600 }}>{c.nexus_gross ? fmtMoney(c.nexus_gross) : "—"}</td>
+                              <td style={{ textAlign: "right", color: "var(--muted)" }}>{c.nexus_net ? fmtMoney(c.nexus_net) : "—"}</td>
+                              <td style={{ textAlign: "right", color: cd >= 0 ? "#1a4fbc" : "var(--empty)" }}>
+                                {cd >= 0 ? "+" : ""}{fmtMoney(cd)}
+                              </td>
+                              <td />
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </td></tr>
+                ) : null,
+              ];
+            })}
+            {weeks.length === 0 && !loading && (
+              <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 20 }}>{t("stat_no_data")}</td></tr>
             )}
-          </div>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* két-vonalas heti diagram */
+function CmpChart({ weeks, showOrder, showInv }: {
+  weeks: [string, { order: number; gross: number }][];
+  showOrder: boolean; showInv: boolean;
+}) {
+  if (!weeks.length) return <div style={{ height: 200, display: "grid", placeItems: "center", color: "var(--muted)" }}>—</div>;
+  const W = 1300, H = 360, padL = 80, padR = 20, padT = 16, padB = 64;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const vals: number[] = [];
+  for (const [, w] of weeks) {
+    if (showOrder) vals.push(w.order);
+    if (showInv) vals.push(w.gross);
+  }
+  const max = Math.max(...vals, 1);
+  const n = weeks.length;
+  const xOf = (i: number) => padL + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+  const yOf = (v: number) => padT + ih - (v / max) * ih;
+  const series: { color: string; get: (w: { order: number; gross: number }) => number }[] = [];
+  if (showOrder) series.push({ color: "#2f7a4f", get: w => w.order });
+  if (showInv) series.push({ color: "#4757d8", get: w => w.gross });
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 380 }}>
+      {Array.from({ length: 5 }).map((_, i) => {
+        const v = (max / 4) * i;
+        const y = padT + ih - (i / 4) * ih;
+        return (
+          <g key={i}>
+            <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#eef2f5" />
+            <text x={padL - 8} y={y + 4} fontSize={11} textAnchor="end" fill="#9ca3af">{fmtMoney(v)}</text>
+          </g>
         );
       })}
-      {weeks.length === 0 && !loading && <div className="center-msg">{t("stat_no_data")}</div>}
-    </div>
+      {series.map((s, si) => (
+        <g key={si}>
+          <polyline fill="none" stroke={s.color} strokeWidth={2}
+                    points={weeks.map(([, w], i) => `${xOf(i)},${yOf(s.get(w))}`).join(" ")} />
+          {weeks.map(([wk, w], i) => (
+            <circle key={i} cx={xOf(i)} cy={yOf(s.get(w))} r={3.5} fill={s.color}>
+              <title>{wk}: {fmtMoney(s.get(w))}</title>
+            </circle>
+          ))}
+        </g>
+      ))}
+      {weeks.map(([wk], i) => (
+        <text key={i} x={xOf(i)} y={H - padB + 18} fontSize={11} fill="#647686"
+              textAnchor="end" transform={`rotate(-35 ${xOf(i)} ${H - padB + 18})`}>{wk}</text>
+      ))}
+    </svg>
   );
 }
 

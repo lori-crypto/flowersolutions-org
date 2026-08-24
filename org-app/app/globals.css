@@ -369,6 +369,14 @@ body.editing .hint{display:block}
   .week-head{gap:8px}
 }
 
+/* ── compare sorozat-kapcsolók ────────────────────────────── */
+.serie-btn{border:1.5px solid var(--line); background:#fff; border-radius:99px;
+  padding:4px 12px; font-size:12.5px; font-weight:700; cursor:pointer; color:var(--muted);
+  opacity:.55}
+.serie-btn.on{opacity:1; color:#fff}
+.serie-btn.order.on{background:#2f7a4f; border-color:#2f7a4f}
+.serie-btn.inv.on{background:#4757d8; border-color:#4757d8}
+
 /* ── haladás kártyák ──────────────────────────────────────── */
 .prog-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr)); gap:14px}
 .prog-card{background:var(--card); border:1px solid var(--line); border-radius:14px;
