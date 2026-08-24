@@ -156,6 +156,8 @@ function ProgressTab() {
                 <span className="muted">
                   {r.k === "orders"
                     ? <>{t("prog_vs_orders")} ({fd(r.prev_from)}): <b>{fmtMoney(r.prev_same)}</b></>
+                    : r.k === "week"
+                    ? <>{t("prog_vs_week_full")} ({fd(r.prev_from)} – {fd(r.prev_same_to)}): <b>{fmtMoney(r.prev_same)}</b></>
                     : <>{t("prog_vs_same")} ({fd(r.prev_from)} – {fd(r.prev_same_to)}): <b>{fmtMoney(r.prev_same)}</b></>}
                 </span>
               </div>

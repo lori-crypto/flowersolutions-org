@@ -46,7 +46,7 @@ declare
   ly_m_end date := (date_trunc('month', ly_date) + interval '1 month - 1 day')::date;
   ly_m_same date := least((ly_m_start + (today - m_start))::date, ly_m_end);
   w_start date; w_end_full date;
-  lw_start date; lw_same date; lw_end date;
+  lw_start date; lw_end date;
   next_liv date; ly_liv date;
 begin
   if not app_has_cap('hr') then raise exception 'Nincs jogosultság.'; end if;
@@ -82,8 +82,6 @@ begin
   ) t where t.d > lw_start;
   if lw_end is null or lw_end > lw_start + 9 then lw_end := lw_start + (w_end_full - w_start); end if;
 
-  lw_same := least(lw_start + (today - w_start), lw_end);
-
   -- következő szállítási nap (előrendelés-kártya) + tavalyi párja
   select min(t.d) into next_liv from (
     select distinct o.data_livrare as d from nexus_orders o
@@ -115,11 +113,13 @@ begin
     (select coalesce(sum(s.real_net),0) from sales_lines s
       where s.tip_doc='Factura' and s.data_doc between ly_m_start and ly_m_end)
   union all
-  select 'week', w_start, today, lw_start, lw_same, lw_end,
+  -- HÉT: a tavalyi TELJES héthez mérünk (a hét mindig a köv. szállítási nap
+  -- előestéjén zárul — kedden vagy szerdán —, rész-hét összevetés nincs)
+  select 'week', w_start, today, lw_start, lw_end, lw_end,
     (select coalesce(sum(s.real_net),0) from sales_lines s
       where s.tip_doc='Factura' and s.data_doc between w_start and today),
     (select coalesce(sum(s.real_net),0) from sales_lines s
-      where s.tip_doc='Factura' and s.data_doc between lw_start and lw_same),
+      where s.tip_doc='Factura' and s.data_doc between lw_start and lw_end),
     (select coalesce(sum(s.real_net),0) from sales_lines s
       where s.tip_doc='Factura' and s.data_doc between lw_start and lw_end)
   union all
