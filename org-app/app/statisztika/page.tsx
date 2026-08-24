@@ -657,7 +657,7 @@ function CompareTab() {
                 <tr key={w.week} onClick={() => setOpen(opened ? null : w.week)} style={{ cursor: "pointer" }}>
                   <td>
                     <b style={{ whiteSpace: "nowrap" }}>{opened ? "▾" : "▸"} {w.week.slice(2)} → {w.week_end.slice(2)}</b>
-                    {w.is_future && <span className="acct-tag" style={{ marginLeft: 6 }}>{t("cmp_next_week")}</span>}
+                    {w.is_future && <span className="acct-tag" style={{ marginLeft: 6, whiteSpace: "nowrap" }}>{t("cmp_next_week")}</span>}
                     {anyLy && <div className="muted" style={{ fontSize: 10.5 }}>
                       {t("cmp_ly_short")}: {fd(w.ly_from)} – {fd(w.ly_to)}</div>}
                   </td>

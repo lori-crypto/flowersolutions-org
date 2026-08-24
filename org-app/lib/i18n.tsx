@@ -200,7 +200,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   cmp_ly_inv:       { hu: "Tavalyi eladás (bruttó)", ro: "Vânzări anul trecut (brut)" },
   cmp_ly_short:     { hu: "tavalyi hét", ro: "săpt. anul trecut" },
   cmp_ly_hint:      { hu: "A tavalyi sorozatok a tavalyi valódi szállítási hetekhez igazítva jelennek meg, és egy héttel előre is látszanak (a jövő hét címkéje sárga).", ro: "Seriile de anul trecut sunt aliniate la săptămânile reale de livrare și se văd cu o săptămână în avans." },
-  cmp_next_week:    { hu: "következő hét", ro: "săptămâna următoare" },
+  cmp_next_week:    { hu: "köv. hét", ro: "săpt. urm." },
   cmp_diff_col:     { hu: "Eltérés (bruttó − rendelés)", ro: "Diferență (brut − comenzi)" },
   stat_tab_progress:{ hu: "Haladás", ro: "Progres" },
   prog_year:        { hu: "év — eddig", ro: "an — până azi" },
