@@ -8,6 +8,9 @@ out/
 .env.local
 .env*.local
 
+# üzleti adatok — SOHA nem kerülnek a repóba
+adatok/
+
 # egyéb
 .DS_Store
 *.log
