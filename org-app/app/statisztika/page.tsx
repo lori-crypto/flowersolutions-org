@@ -438,7 +438,7 @@ function CompareTab() {
 function YoYChart({ series }: {
   series: { year: number; vals: (number | null)[]; color: string }[];
 }) {
-  const W = 900, H = 400, padL = 64, padR = 16, padT = 66, padB = 40;
+  const W = 1300, H = 430, padL = 70, padR = 16, padT = 66, padB = 40;
   const iw = W - padL - padR, ih = H - padT - padB;
   const allVals = series.flatMap(s => s.vals.filter((v): v is number => v != null));
   const max = Math.max(...allVals, 1);
@@ -446,7 +446,7 @@ function YoYChart({ series }: {
   const ticks = 4;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 400 }}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 460 }}>
       {/* jelmagyarázat */}
       {series.map((s, i) => (
         <g key={s.year} transform={`translate(${padL + i * 90}, 12)`}>
@@ -507,7 +507,7 @@ function Chart({ data, type, fmtVal }: {
   data: { label: string; value: number }[]; type: string; fmtVal: (v: number) => string;
 }) {
   if (!data.length) return <div style={{ height: 260, display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 14 }}>—</div>;
-  const W = 900, H = 340, padL = 64, padR = 16, padT = 16, padB = 74;
+  const W = 1300, H = 380, padL = 70, padR = 16, padT = 16, padB = 74;
   const iw = W - padL - padR, ih = H - padT - padB;
 
   if (type === "pie") {
@@ -524,7 +524,7 @@ function Chart({ data, type, fmtVal }: {
       return { path: `M${cx},${cy} L${x0.toFixed(1)},${y0.toFixed(1)} A${r},${r} 0 ${large} 1 ${x1.toFixed(1)},${y1.toFixed(1)} Z`, color: PIE_COLORS[i % PIE_COLORS.length], d };
     });
     return (
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 360 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 420 }}>
         {slices.map((s, i) => (
           <path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth={1.5}>
             <title>{s.d.label}: {fmtVal(s.d.value)}</title>
@@ -552,7 +552,7 @@ function Chart({ data, type, fmtVal }: {
   const showEvery = Math.ceil(n / 16);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 360 }}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 420 }}>
       {Array.from({ length: ticks + 1 }).map((_, i) => {
         const v = min + (range / ticks) * i;
         const y = padT + ih - (i / ticks) * ih;
