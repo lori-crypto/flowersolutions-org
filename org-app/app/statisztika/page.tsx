@@ -433,11 +433,10 @@ function CompareTab() {
 function YoYChart({ series }: {
   series: { year: number; vals: (number | null)[]; color: string }[];
 }) {
-  const W = 900, H = 380, padL = 64, padR = 16, padT = 34, padB = 40;
+  const W = 900, H = 400, padL = 64, padR = 16, padT = 66, padB = 40;
   const iw = W - padL - padR, ih = H - padT - padB;
   const allVals = series.flatMap(s => s.vals.filter((v): v is number => v != null));
   const max = Math.max(...allVals, 1);
-  const xOf = (m: number) => padL + (m / 11) * iw;
   const yOf = (v: number) => padT + ih - (v / max) * ih;
   const ticks = 4;
 
@@ -461,34 +460,39 @@ function YoYChart({ series }: {
           </g>
         );
       })}
-      {/* sorozatok — vékony vonalak + pont-értékek */}
-      {series.map((s, si) => {
-        const pts = s.vals.map((v, m) => (v != null ? { m, v } : null))
-          .filter((p): p is { m: number; v: number } => p != null);
+      {/* csoportosított oszlopok: hónaponként a 3 év egymás mellett */}
+      {HONAPOK.map((hn, m) => {
+        const slotW = iw / 12;
+        const slotX = padL + m * slotW;
+        const gap = 2;
+        const bw = Math.min(20, (slotW * 0.78 - gap * (series.length - 1)) / series.length);
+        const groupW = bw * series.length + gap * (series.length - 1);
+        const startX = slotX + (slotW - groupW) / 2;
         return (
-          <g key={s.year}>
-            <polyline fill="none" stroke={s.color} strokeWidth={1.5}
-                      points={pts.map(p => `${xOf(p.m)},${yOf(p.v)}`).join(" ")} />
-            {pts.map(p => (
-              <g key={p.m}>
-                <circle cx={xOf(p.m)} cy={yOf(p.v)} r={2.8} fill={s.color}>
-                  <title>{s.year} {HONAPOK[p.m]}: {fmtMoney(p.v)}</title>
-                </circle>
-                <text x={xOf(p.m)} y={yOf(p.v) - 6 - ((series.length - 1 - si) % 2) * 9}
-                      fontSize={8.5} textAnchor="middle" fill={s.color} fontWeight={700}>
-                  {fmtShort(p.v)}
-                </text>
-              </g>
-            ))}
+          <g key={hn}>
+            {series.map((s, si) => {
+              const v = s.vals[m];
+              if (v == null) return null;
+              const x = startX + si * (bw + gap);
+              const y = yOf(v);
+              return (
+                <g key={s.year}>
+                  <rect x={x} y={y} width={bw} height={padT + ih - y} rx={2} fill={s.color}>
+                    <title>{s.year} {hn}: {fmtMoney(v)}</title>
+                  </rect>
+                  <text x={x + bw / 2 + 3} y={y - 5} fontSize={8.5} fontWeight={700}
+                        fill={s.color} textAnchor="start"
+                        transform={`rotate(-90 ${x + bw / 2 + 3} ${y - 5})`}>
+                    {fmtShort(v)}
+                  </text>
+                </g>
+              );
+            })}
+            <text x={slotX + slotW / 2} y={H - padB + 18} fontSize={11}
+                  textAnchor="middle" fill="#647686">{hn}</text>
           </g>
         );
       })}
-      {/* hónap-címkék */}
-      {HONAPOK.map((hn, m) => (
-        <text key={hn} x={xOf(m)} y={H - padB + 18} fontSize={11} textAnchor="middle" fill="#647686">
-          {hn}
-        </text>
-      ))}
     </svg>
   );
 }
