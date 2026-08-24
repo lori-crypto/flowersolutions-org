@@ -124,9 +124,9 @@ begin
       where s.tip_doc='Factura' and s.data_doc between lw_start and lw_end)
   union all
   select 'orders', next_liv, next_liv, ly_liv, ly_liv, ly_liv,
-    (select coalesce(sum(o.valoare),0) from nexus_orders o where o.data_livrare = next_liv),
-    (select coalesce(sum(o.valoare),0) from nexus_orders o where o.data_livrare = ly_liv),
-    (select coalesce(sum(o.valoare),0) from nexus_orders o where o.data_livrare = ly_liv)
+    (select coalesce(sum(o.valoare_tva),0) from nexus_orders o where o.data_livrare = next_liv),
+    (select coalesce(sum(o.valoare_tva),0) from nexus_orders o where o.data_livrare = ly_liv),
+    (select coalesce(sum(o.valoare_tva),0) from nexus_orders o where o.data_livrare = ly_liv)
   where next_liv is not null;
 end $$;
 
