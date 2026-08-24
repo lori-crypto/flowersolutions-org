@@ -124,6 +124,7 @@ export async function GET(req: NextRequest) {
         anluna,
         cont: null,
         nume_cli: String(h["den_client"] ?? "").trim() || null,
+        id_client: h["id_client"] != null ? String(h["id_client"]).trim() : null,
         nume_gest: null,
         cod_ext: cod || null,
         denumire: String(l["den_produs"] ?? "").trim() || null,
