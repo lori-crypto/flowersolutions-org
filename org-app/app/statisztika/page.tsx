@@ -632,7 +632,7 @@ function CompareTab() {
               return [
                 <tr key={w.week} onClick={() => setOpen(opened ? null : w.week)} style={{ cursor: "pointer" }}>
                   <td>
-                    <b>{opened ? "▾" : "▸"} {w.week} → {w.week_end}</b>
+                    <b style={{ whiteSpace: "nowrap" }}>{opened ? "▾" : "▸"} {w.week.slice(2)} → {w.week_end.slice(2)}</b>
                     {w.is_future && <span className="acct-tag" style={{ marginLeft: 6 }}>{t("cmp_next_week")}</span>}
                     {anyLy && <div className="muted" style={{ fontSize: 10.5 }}>
                       {t("cmp_ly_short")}: {fd(w.ly_from)} – {fd(w.ly_to)}</div>}
@@ -758,7 +758,7 @@ function CmpChart({ weeks, sOrder, sInv, sLyOrder, sLyInv }: {
       {weeks.map((w, i) => (
         <text key={i} x={xOf(i)} y={H - padB + 18} fontSize={11}
               fill={w.is_future ? "#b58a1f" : "#647686"} fontWeight={w.is_future ? 700 : 400}
-              textAnchor="end" transform={`rotate(-35 ${xOf(i)} ${H - padB + 18})`}>{w.week}</text>
+              textAnchor="end" transform={`rotate(-35 ${xOf(i)} ${H - padB + 18})`}>{w.week.slice(2)}</text>
       ))}
     </svg>
   );
