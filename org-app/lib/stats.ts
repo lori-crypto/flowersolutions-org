@@ -41,7 +41,7 @@ export async function statCompare(from: string, to: string): Promise<CompareRow[
 }
 
 export type ProgressRow = {
-  k: "year" | "month" | "week";
+  k: "year" | "month" | "week" | "orders";
   cur_from: string; cur_to: string;
   prev_from: string; prev_same_to: string; prev_full_to: string;
   cur: number; prev_same: number; prev_full: number;

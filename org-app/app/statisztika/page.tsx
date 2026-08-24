@@ -127,8 +127,12 @@ function ProgressTab() {
       icon: "🚚",
       title: r => t("prog_week") + " (" + fd(r.cur_from) + " – " + fd(addDays(r.prev_full_to, 364)) + ")",
     },
+    orders: {
+      icon: "📦",
+      title: r => t("prog_orders") + " — " + fd(r.cur_from),
+    },
   };
-  const order: ProgressRow["k"][] = ["week", "month", "year"];
+  const order: ProgressRow["k"][] = ["orders", "week", "month", "year"];
   const sorted = order.map(k => rows.find(r => r.k === k)).filter((r): r is ProgressRow => !!r);
 
   return (
@@ -150,7 +154,9 @@ function ProgressTab() {
                   </span>
                 )}
                 <span className="muted">
-                  {t("prog_vs_same")} ({fd(r.prev_from)} – {fd(r.prev_same_to)}): <b>{fmtMoney(r.prev_same)}</b>
+                  {r.k === "orders"
+                    ? <>{t("prog_vs_orders")} ({fd(r.prev_from)}): <b>{fmtMoney(r.prev_same)}</b></>
+                    : <>{t("prog_vs_same")} ({fd(r.prev_from)} – {fd(r.prev_same_to)}): <b>{fmtMoney(r.prev_same)}</b></>}
                 </span>
               </div>
 

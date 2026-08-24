@@ -186,6 +186,8 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   prog_of_full:     { hu: "a tavalyi teljesből", ro: "din totalul de anul trecut" },
   prog_left:        { hu: "a rekordig", ro: "până la record" },
   prog_beat:        { hu: "Tavalyi teljes túlszárnyalva!", ro: "Recordul de anul trecut depășit!" },
+  prog_orders:      { hu: "Előrendelések a köv. szállításra", ro: "Precomenzi pentru următoarea livrare" },
+  prog_vs_orders:   { hu: "tavalyi megfelelő szállítás végleges rendelés-állománya", ro: "comenzile finale ale livrării corespunzătoare de anul trecut" },
   prog_hint:        { hu: "Nettó (valós, kedvezmény utáni) értékek. A hét a szállítási nappal kezdődik; a tavalyi összevetés pontosan 364 nappal korábbi, azonos hosszú időszak — így a hétköznapok fedik egymást. A speciális időszakok (Valentin-nap, március 8. stb.) külön összevetése később, egyedi intervallumokkal kerül ide.", ro: "Valori nete reale. Săptămâna începe cu ziua de livrare; comparația e cu perioada de acum 364 de zile." },
 };
 
