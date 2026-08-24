@@ -53,6 +53,13 @@ Utolsó frissítés: 2026-08-19
   RO ünnepnapok 2027-re. **Teendő: `sql/04_szabadsag.sql` futtatása a Supabase-ben!**
   Hátravan (2-3. ütem): ügyelet-beosztás + csere, értesítések, nyomtatás.
 
+- ✅ **Értékesítési adatvagyon betöltve** (2026-08-24): `sales_lines` tábla,
+  **419 619 számlasor** (2024: 139 425, 2025: 163 920, 2026 jan–aug: 116 274),
+  minden hónap sorra egyeztetve a forrás-CSV-kkel. Valós értékek előre számolva
+  (kedvezmény + 2 aviz-ügyfél −5%); beszerzési érték is bent (árrés-elemzéshez).
+  Export-formátum hitelesítve a NEXUS-szal (fillérre). Olvasás: csak HR/admin.
+  Betöltő: `scripts/load_sales.py`; forrásfájlok: `adatok/` (gitből kizárva).
+
 ## Későbbi modulok
 
 Pénzügy (NEXUS-szinkron), Projekt, HR, Irányelvek — lásd `TECHNIKAI_TERV.md`.
