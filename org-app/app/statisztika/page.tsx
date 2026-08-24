@@ -115,11 +115,10 @@ function SalesTab() {
   const load = useCallback(async () => {
     setLoading(true); setErr("");
     try {
-      const [r, tot] = await Promise.all([
-        withAuthRetry(() => statSales({ from, to, dim, client, grupa, q, inv: measure === "invoices" })),
-        withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q, inv: true })),
-      ]);
+      // szándékosan egymás után (nem párhuzamosan): a kis DB-gépen így stabilabb
+      const r = await withAuthRetry(() => statSales({ from, to, dim, client, grupa, q, inv: measure === "invoices" }));
       setRows(r);
+      const tot = await withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q, inv: true }));
       setTotal(tot[0] ?? null);
     } catch (e) { setErr((e as Error).message); }
     setLoading(false);
