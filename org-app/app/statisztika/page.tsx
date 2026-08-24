@@ -149,7 +149,7 @@ function SalesTab() {
   const chartData = useMemo(() => {
     let arr = rows.map(r => ({ label: r.label, value: valOf(r) }));
     if (measure === "margin") arr = arr.filter(x => x.value !== 0);
-    if (dim === "day" || dim === "month") arr.sort((a, b) => a.label.localeCompare(b.label));
+    if (dim === "day" || dim === "month" || dim === "year") arr.sort((a, b) => a.label.localeCompare(b.label));
     else { arr.sort((a, b) => b.value - a.value); arr = arr.slice(0, 30); }
     return arr;
   }, [rows, dim, measure, valOf]);
@@ -298,6 +298,7 @@ function SalesTab() {
         )}
         {yoy ? <GroupedBarChart cats={HONAPOK} series={yoySeries} />
          : clientPivot ? <GroupedBarChart cats={clientPivot.cats} series={clientPivot.series} catAngle={-32} />
+         : dim === "year" && ctype !== "pie" ? <YearChart data={chartData} fmtVal={fmtVal} />
          : <Chart data={chartData} type={ctype} fmtVal={fmtVal} />}
       </div>
 
@@ -510,6 +511,38 @@ function CompareTab() {
       })}
       {weeks.length === 0 && !loading && <div className="center-msg">{t("stat_no_data")}</div>}
     </div>
+  );
+}
+
+/* ══════════ Éves összesítő: szoros oszlopok, nagy számokkal ══════════ */
+function YearChart({ data, fmtVal }: {
+  data: { label: string; value: number }[]; fmtVal: (v: number) => string;
+}) {
+  const n = Math.max(data.length, 1);
+  const bw = 110, gap = 46, padL = 24, padR = 24, padT = 56, padB = 44;
+  const W = padL + padR + n * bw + (n - 1) * gap;
+  const H = 360, ih = H - padT - padB;
+  const max = Math.max(...data.map(d => d.value), 1);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`}
+         style={{ display: "block", margin: "0 auto", width: "100%", maxWidth: W * 1.35 }}>
+      {data.map((d, i) => {
+        const x = padL + i * (bw + gap);
+        const h = (Math.max(0, d.value) / max) * ih;
+        const y = padT + ih - h;
+        return (
+          <g key={d.label}>
+            <rect x={x} y={y} width={bw} height={h} rx={6} fill="#2f7a4f">
+              <title>{d.label}: {fmtVal(d.value)}</title>
+            </rect>
+            <text x={x + bw / 2} y={y - 14} fontSize={19} fontWeight={800}
+                  textAnchor="middle" fill="#1d5a33">{fmtVal(d.value)}</text>
+            <text x={x + bw / 2} y={H - padB + 26} fontSize={16} fontWeight={700}
+                  textAnchor="middle" fill="#3a4a57">{d.label}</text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
