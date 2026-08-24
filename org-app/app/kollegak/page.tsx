@@ -11,6 +11,13 @@ type PersonRow = {
   phone: string | null; lang: string; active: boolean;
 };
 
+const CAPS = [
+  { key: "admin", tk: "cap_admin" },
+  { key: "hr", tk: "cap_hr" },
+  { key: "tabla.szerkesztes", tk: "cap_tabla" },
+  { key: "posztleiras.szerkesztes", tk: "cap_posztleiras" },
+];
+
 const AV_COLORS = ["#2f6fed", "#0e7c86", "#b3541e", "#2e7d32", "#8e3b8e", "#c2851a", "#1565c0", "#5b5f97"];
 const avColor = (s: string) => AV_COLORS[(s.charCodeAt(0) || 0) % AV_COLORS.length];
 const initialsOf = (n: string) => n.trim().split(/\s+/).map(w => w[0] || "").join("").slice(0, 2);
@@ -22,32 +29,53 @@ export default function KollegakPage() {
   const [boards, setBoards] = useState<LeaveBoard[]>([]);
   const [members, setMembers] = useState<BoardMember[]>([]);
   const [isHr, setIsHr] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [pcaps, setPcaps] = useState<{ person_id: string; capability: string }[]>([]);
   const [edit, setEdit] = useState<PersonRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [err, setErr] = useState("");
 
   const reload = useCallback(async () => await withAuthRetry(async () => {
-    const [pQ, bQ, mQ] = await Promise.all([
+    const [pQ, bQ, mQ, cQ] = await Promise.all([
       supabase.from("persons").select("*").order("active", { ascending: false }).order("name"),
       supabase.from("leave_boards").select("*").order("sort"),
       supabase.from("board_members").select("*"),
+      supabase.from("person_capabilities").select("person_id, capability"),
     ]);
     if (pQ.error) { setErr(pQ.error.message); return; }
     setPersons((pQ.data as PersonRow[]) ?? []);
     setBoards((bQ.data as LeaveBoard[]) ?? []);
     setMembers((mQ.data as BoardMember[]) ?? []);
+    setPcaps((cQ.data as { person_id: string; capability: string }[]) ?? []);
   }), []);
 
   useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
-      const { data: caps } = await supabase.from("person_capabilities").select("capability");
-      const capSet = new Set((caps ?? []).map(c => c.capability));
-      setIsHr(capSet.has("hr") || capSet.has("admin"));
+      setMyUserId(session.user.id);
+      const { data: me } = await supabase.from("persons")
+        .select("id").eq("user_id", session.user.id).maybeSingle();
+      const { data: caps } = await supabase.from("person_capabilities")
+        .select("person_id, capability");
+      const mine = new Set((caps ?? [])
+        .filter(c => c.person_id === me?.id).map(c => c.capability));
+      setIsHr(mine.has("hr") || mine.has("admin"));
+      setIsAdmin(mine.has("admin"));
       await reload();
     })();
   }, [router, reload]);
+
+  async function toggleCap(p: PersonRow, cap: string, on: boolean) {
+    const q = on
+      ? supabase.from("person_capabilities").insert({ person_id: p.id, capability: cap })
+      : supabase.from("person_capabilities").delete()
+          .eq("person_id", p.id).eq("capability", cap);
+    const { error } = await q;
+    if (error) { alert(error.message); }
+    await reload();
+  }
 
   async function toggleActive(p: PersonRow) {
     const { error } = await supabase.from("persons").update({ active: !p.active }).eq("id", p.id);
@@ -119,6 +147,24 @@ export default function KollegakPage() {
                                catch (ex) { alert((ex as Error).message); }
                              }} />
                       {pick(b.name_hu, b.name_ro)}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {isAdmin && p.active && (
+              <div className="person-boards">
+                <span className="muted">{t("p_caps")}:</span>
+                {CAPS.map(c => {
+                  const on = pcaps.some(x => x.person_id === p.id && x.capability === c.key);
+                  const lockedSelf = c.key === "admin" && on && p.user_id === myUserId;
+                  return (
+                    <label key={c.key} className="board-check"
+                           title={lockedSelf ? t("cap_self_lock") : undefined}
+                           style={lockedSelf ? { opacity: .6 } : undefined}>
+                      <input type="checkbox" checked={on} disabled={lockedSelf}
+                             onChange={e => toggleCap(p, c.key, e.target.checked)} />
+                      {t(c.tk)}
                     </label>
                   );
                 })}
