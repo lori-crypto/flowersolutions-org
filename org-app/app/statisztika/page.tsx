@@ -178,6 +178,23 @@ function SalesTab() {
     <div className="stat-wrap">
       {/* szűrők */}
       <div className="stat-card stat-filters">
+        <div><label>Év</label>
+          <div style={{ display: "flex", gap: 4 }}>
+            {Array.from({ length: now.getFullYear() - 2023 }, (_, i) => 2024 + i).map(y => {
+              const yf = `${y}-01-01`;
+              const yt = y === now.getFullYear() ? iso(now) : `${y}-12-31`;
+              const on = from === yf && to === yt;
+              return (
+                <button key={y} className={"bchip" + (on ? " on" : "")}
+                        style={{ padding: "5px 10px" }}
+                        onClick={() => { setFrom(yf); setTo(yt); }}>{y}</button>
+              );
+            })}
+            <button className={"bchip" + (from === "2024-01-01" && to === iso(now) ? " on" : "")}
+                    style={{ padding: "5px 10px" }}
+                    onClick={() => { setFrom("2024-01-01"); setTo(iso(now)); }}>Mind</button>
+          </div>
+        </div>
         <div><label>{t("f_from")}</label>
           <input type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
         <div><label>{t("f_to")}</label>
@@ -506,7 +523,7 @@ function Chart({ data, type, fmtVal }: {
   data: { label: string; value: number }[]; type: string; fmtVal: (v: number) => string;
 }) {
   if (!data.length) return <div style={{ height: 260, display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 14 }}>—</div>;
-  const W = 1300, H = 380, padL = 70, padR = 16, padT = 16, padB = 74;
+  const W = 1300, H = 410, padL = 70, padR = 16, padT = 48, padB = 74;
   const iw = W - padL - padR, ih = H - padT - padB;
 
   if (type === "pie") {
@@ -567,10 +584,19 @@ function Chart({ data, type, fmtVal }: {
         const x = xOf(i) - bw / 2;
         const y0 = yOf(0), y1 = yOf(d.value);
         return (
-          <rect key={i} x={x} y={Math.min(y0, y1)} width={bw} height={Math.abs(y0 - y1)} rx={2}
-                fill={d.value >= 0 ? "#2f7a4f" : "#c0392b"}>
-            <title>{d.label}: {fmtVal(d.value)}</title>
-          </rect>
+          <g key={i}>
+            <rect x={x} y={Math.min(y0, y1)} width={bw} height={Math.abs(y0 - y1)} rx={2}
+                  fill={d.value >= 0 ? "#2f7a4f" : "#c0392b"}>
+              <title>{d.label}: {fmtVal(d.value)}</title>
+            </rect>
+            {n <= 40 && (
+              <text x={xOf(i) + 3} y={Math.min(y0, y1) - 5} fontSize={8.5} fontWeight={700}
+                    fill={d.value >= 0 ? "#2f7a4f" : "#c0392b"} textAnchor="start"
+                    transform={`rotate(-90 ${xOf(i) + 3} ${Math.min(y0, y1) - 5})`}>
+                {fmtShort(d.value)}
+              </text>
+            )}
+          </g>
         );
       })}
       {type === "line" && (<>
