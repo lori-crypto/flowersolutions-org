@@ -60,6 +60,12 @@ Utolsó frissítés: 2026-08-19
   Export-formátum hitelesítve a NEXUS-szal (fillérre). Olvasás: csak HR/admin.
   Betöltő: `scripts/load_sales.py`; forrásfájlok: `adatok/` (gitből kizárva).
 
+- ✅ **Éjszakai NEXUS-szinkron ÉL** (2026-08-24): Vercel cron 1:20 UTC →
+  `/api/sales-sync` → futó+előző hónap teljes cseréje az API-ból (source:
+  nexus_api). Számla-szintű hitelesítés: aug. 668/668 fillérre, júl. 1091/1092.
+  Tanulságok: az API kedvezménye KÜLÖN negatív sor (procent_discount csak infó),
+  ÁFA a cota_tva_ies mezőből (21%), érték = mennyiség × egységár.
+
 ## Későbbi modulok
 
 Pénzügy (NEXUS-szinkron), Projekt, HR, Irányelvek — lásd `TECHNIKAI_TERV.md`.
