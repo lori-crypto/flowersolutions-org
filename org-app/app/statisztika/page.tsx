@@ -11,6 +11,14 @@ const iso = (d: Date) =>
 const fmtInt = (n: number) => Math.round(n).toLocaleString("hu-HU");
 const fmtMoney = (n: number) =>
   Math.round(n).toLocaleString("hu-HU");
+const fmtShort = (n: number) => {
+  const a = Math.abs(n);
+  if (a >= 1_000_000) return (n / 1_000_000).toLocaleString("hu-HU", { maximumFractionDigits: 2 }) + "M";
+  if (a >= 10_000) return Math.round(n / 1000).toLocaleString("hu-HU") + "e";
+  return Math.round(n).toLocaleString("hu-HU");
+};
+const YEAR_PALETTE = ["#2f7a4f", "#3b82f6", "#9ca3af", "#f59e0b", "#8b5cf6"];
+const HONAPOK = ["jan", "febr", "márc", "ápr", "máj", "jún", "júl", "aug", "szept", "okt", "nov", "dec"];
 const PIE_COLORS = ["#2f7a4f", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6",
   "#ec4899", "#84cc16", "#6366f1", "#f97316", "#06b6d4", "#a855f7"];
 
@@ -151,6 +159,25 @@ function SalesTab() {
   const dimLabel = DIMS.find(d => d.k === dim)?.l ?? "";
   const measureLabel = MEASURES.find(m => m.k === measure)?.l ?? "";
 
+  // év/év sorozatok (hónap dimenziónál): év → 12 havi érték
+  const yoySeries = useMemo(() => {
+    if (dim !== "month") return [];
+    const byYear = new Map<number, (number | null)[]>();
+    for (const r of rows) {
+      const y = Number(r.label.slice(0, 4)), m = Number(r.label.slice(5, 7));
+      if (!y || !m) continue;
+      let arr = byYear.get(y);
+      if (!arr) { arr = Array(12).fill(null); byYear.set(y, arr); }
+      arr[m - 1] = valOf(r);
+    }
+    return Array.from(byYear.entries()).sort((a, b) => a[0] - b[0])
+      .map(([year, vals], i, all) => ({
+        year, vals,
+        color: YEAR_PALETTE[(all.length - 1 - i) % YEAR_PALETTE.length],
+      }));
+  }, [rows, dim, valOf]);
+  const yoy = dim === "month" && yoySeries.length > 1;
+
   return (
     <div className="stat-wrap">
       {/* szűrők */}
@@ -220,7 +247,8 @@ function SalesTab() {
         {measure === "margin" && (
           <div className="fhint" style={{ marginBottom: 8 }}>{t("stat_margin_note")}</div>
         )}
-        <Chart data={chartData} type={ctype} fmtVal={fmtVal} />
+        {yoy ? <YoYChart series={yoySeries} />
+             : <Chart data={chartData} type={ctype} fmtVal={fmtVal} />}
       </div>
 
       {/* adattábla */}
@@ -232,21 +260,55 @@ function SalesTab() {
           </button>
         </div>
         <div style={{ maxHeight: 380, overflow: "auto" }}>
-          <table className="stat-table">
-            <thead><tr><th>{dimLabel}</th><th style={{ textAlign: "right" }}>{measureLabel}</th></tr></thead>
-            <tbody>
-              {chartData.map(r => (
-                <tr key={r.label}>
-                  <td>{r.label}</td>
-                  <td style={{ textAlign: "right", fontWeight: 600 }}>{fmtVal(r.value)}</td>
-                </tr>
-              ))}
-              {chartData.length === 0 && (
-                <tr><td colSpan={2} className="muted" style={{ textAlign: "center", padding: 20 }}>
-                  {loading ? t("loading") : t("stat_no_data")}</td></tr>
-              )}
-            </tbody>
-          </table>
+          {yoy ? (
+            <table className="stat-table">
+              <thead><tr>
+                <th>Hónap</th>
+                {yoySeries.map(s => (
+                  <th key={s.year} style={{ textAlign: "right", color: s.color }}>{s.year}</th>
+                ))}
+                <th style={{ textAlign: "right" }}>Δ% ({yoySeries[yoySeries.length - 2]?.year}→{yoySeries[yoySeries.length - 1]?.year})</th>
+              </tr></thead>
+              <tbody>
+                {HONAPOK.map((hn, mi) => {
+                  const prev = yoySeries[yoySeries.length - 2]?.vals[mi];
+                  const cur = yoySeries[yoySeries.length - 1]?.vals[mi];
+                  const pct = prev && cur != null ? Math.round(((cur - prev) / prev) * 100) : null;
+                  return (
+                    <tr key={hn}>
+                      <td style={{ textTransform: "capitalize" }}>{hn}</td>
+                      {yoySeries.map(s => (
+                        <td key={s.year} style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                          {s.vals[mi] != null ? fmtVal(s.vals[mi]!) : "—"}
+                        </td>
+                      ))}
+                      <td style={{ textAlign: "right" }}>
+                        {pct != null
+                          ? <span className={"pct-tag" + (pct >= 0 ? " pos" : " neg")}>{pct >= 0 ? "+" : ""}{pct}%</span>
+                          : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <table className="stat-table">
+              <thead><tr><th>{dimLabel}</th><th style={{ textAlign: "right" }}>{measureLabel}</th></tr></thead>
+              <tbody>
+                {chartData.map(r => (
+                  <tr key={r.label}>
+                    <td>{r.label}</td>
+                    <td style={{ textAlign: "right", fontWeight: 600 }}>{fmtVal(r.value)}</td>
+                  </tr>
+                ))}
+                {chartData.length === 0 && (
+                  <tr><td colSpan={2} className="muted" style={{ textAlign: "center", padding: 20 }}>
+                    {loading ? t("loading") : t("stat_no_data")}</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
@@ -367,6 +429,70 @@ function CompareTab() {
   );
 }
 
+/* ══════════ Év/év összehasonlító vonaldiagram ══════════ */
+function YoYChart({ series }: {
+  series: { year: number; vals: (number | null)[]; color: string }[];
+}) {
+  const W = 900, H = 380, padL = 64, padR = 16, padT = 34, padB = 40;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const allVals = series.flatMap(s => s.vals.filter((v): v is number => v != null));
+  const max = Math.max(...allVals, 1);
+  const xOf = (m: number) => padL + (m / 11) * iw;
+  const yOf = (v: number) => padT + ih - (v / max) * ih;
+  const ticks = 4;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 400 }}>
+      {/* jelmagyarázat */}
+      {series.map((s, i) => (
+        <g key={s.year} transform={`translate(${padL + i * 90}, 12)`}>
+          <line x1={0} y1={0} x2={22} y2={0} stroke={s.color} strokeWidth={2.5} />
+          <text x={28} y={4} fontSize={13} fontWeight={700} fill={s.color}>{s.year}</text>
+        </g>
+      ))}
+      {/* rács */}
+      {Array.from({ length: ticks + 1 }).map((_, i) => {
+        const v = (max / ticks) * i;
+        const y = padT + ih - (i / ticks) * ih;
+        return (
+          <g key={i}>
+            <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#eef2f5" />
+            <text x={padL - 8} y={y + 4} fontSize={11} textAnchor="end" fill="#9ca3af">{fmtShort(v)}</text>
+          </g>
+        );
+      })}
+      {/* sorozatok — vékony vonalak + pont-értékek */}
+      {series.map((s, si) => {
+        const pts = s.vals.map((v, m) => (v != null ? { m, v } : null))
+          .filter((p): p is { m: number; v: number } => p != null);
+        return (
+          <g key={s.year}>
+            <polyline fill="none" stroke={s.color} strokeWidth={1.5}
+                      points={pts.map(p => `${xOf(p.m)},${yOf(p.v)}`).join(" ")} />
+            {pts.map(p => (
+              <g key={p.m}>
+                <circle cx={xOf(p.m)} cy={yOf(p.v)} r={2.8} fill={s.color}>
+                  <title>{s.year} {HONAPOK[p.m]}: {fmtMoney(p.v)}</title>
+                </circle>
+                <text x={xOf(p.m)} y={yOf(p.v) - 6 - ((series.length - 1 - si) % 2) * 9}
+                      fontSize={8.5} textAnchor="middle" fill={s.color} fontWeight={700}>
+                  {fmtShort(p.v)}
+                </text>
+              </g>
+            ))}
+          </g>
+        );
+      })}
+      {/* hónap-címkék */}
+      {HONAPOK.map((hn, m) => (
+        <text key={hn} x={xOf(m)} y={H - padB + 18} fontSize={11} textAnchor="middle" fill="#647686">
+          {hn}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
 /* ══════════ SVG diagram (a webshop BI-ból portolva) ══════════ */
 function Chart({ data, type, fmtVal }: {
   data: { label: string; value: number }[]; type: string; fmtVal: (v: number) => string;
@@ -440,12 +566,18 @@ function Chart({ data, type, fmtVal }: {
         );
       })}
       {type === "line" && (<>
-        <polyline fill="none" stroke="#2f7a4f" strokeWidth={2.5}
+        <polyline fill="none" stroke="#2f7a4f" strokeWidth={1.5}
                   points={data.map((d, i) => `${xOf(i)},${yOf(d.value)}`).join(" ")} />
         {data.map((d, i) => (
-          <circle key={i} cx={xOf(i)} cy={yOf(d.value)} r={3.2} fill="#2f7a4f">
-            <title>{d.label}: {fmtVal(d.value)}</title>
-          </circle>
+          <g key={i}>
+            <circle cx={xOf(i)} cy={yOf(d.value)} r={2.8} fill="#2f7a4f">
+              <title>{d.label}: {fmtVal(d.value)}</title>
+            </circle>
+            {n <= 20 && (
+              <text x={xOf(i)} y={yOf(d.value) - 7} fontSize={8.5} textAnchor="middle"
+                    fill="#2f7a4f" fontWeight={700}>{fmtShort(d.value)}</text>
+            )}
+          </g>
         ))}
       </>)}
       {data.map((d, i) => (i % showEvery === 0 || n <= 16) ? (
