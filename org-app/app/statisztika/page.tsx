@@ -23,7 +23,8 @@ const PIE_COLORS = ["#2f7a4f", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#14b
   "#ec4899", "#84cc16", "#6366f1", "#f97316", "#06b6d4", "#a855f7"];
 
 const DIMS = [
-  { k: "day", l: "Nap" }, { k: "month", l: "Hónap" }, { k: "client", l: "Ügyfél" },
+  { k: "day", l: "Nap" }, { k: "month", l: "Hónap" }, { k: "year", l: "Év" },
+  { k: "client", l: "Ügyfél" },
   { k: "grupa", l: "Termékcsoport" }, { k: "clasa", l: "Osztály (clasa)" },
   { k: "subclasa", l: "Alosztály (subclasa)" }, { k: "product", l: "Termék" },
 ];
@@ -112,17 +113,20 @@ function SalesTab() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
+  const multiYear = Number(to.slice(0, 4)) > Number(from.slice(0, 4));
+  const effDim = dim === "client" && multiYear ? "client_year" : dim;
+
   const load = useCallback(async () => {
     setLoading(true); setErr("");
     try {
       // szándékosan egymás után (nem párhuzamosan): a kis DB-gépen így stabilabb
-      const r = await withAuthRetry(() => statSales({ from, to, dim, client, grupa, q, inv: measure === "invoices" }));
+      const r = await withAuthRetry(() => statSales({ from, to, dim: effDim, client, grupa, q, inv: measure === "invoices" }));
       setRows(r);
       const tot = await withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q, inv: true }));
       setTotal(tot[0] ?? null);
     } catch (e) { setErr((e as Error).message); }
     setLoading(false);
-  }, [from, to, dim, client, grupa, q, measure]);
+  }, [from, to, effDim, client, grupa, q, measure]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -168,11 +172,35 @@ function SalesTab() {
     }
     return Array.from(byYear.entries()).sort((a, b) => a[0] - b[0])
       .map(([year, vals], i, all) => ({
-        year, vals,
+        name: String(year), vals,
         color: YEAR_PALETTE[(all.length - 1 - i) % YEAR_PALETTE.length],
       }));
   }, [rows, dim, valOf]);
   const yoy = dim === "month" && yoySeries.length > 1;
+
+  // ügyfél × év pivot (több éves időszaknál, Ügyfél dimenzióval)
+  const clientPivot = useMemo(() => {
+    if (effDim !== "client_year") return null;
+    const years = Array.from(new Set(rows.map(r => r.label.split("¦")[0]))).sort();
+    const byClient = new Map<string, (number | null)[]>();
+    for (const r of rows) {
+      const [y, ...rest] = r.label.split("¦");
+      const cli = rest.join("¦") || "—";
+      let arr = byClient.get(cli);
+      if (!arr) { arr = Array(years.length).fill(null); byClient.set(cli, arr); }
+      arr[years.indexOf(y)] = valOf(r);
+    }
+    const list = Array.from(byClient.entries())
+      .map(([cli, vals]) => ({ cli, vals, last: vals[vals.length - 1] ?? 0 }))
+      .sort((a, b) => (b.last || 0) - (a.last || 0));
+    const series = years.map((y, yi) => ({
+      name: y,
+      color: YEAR_PALETTE[(years.length - 1 - yi) % YEAR_PALETTE.length],
+      vals: list.slice(0, 12).map(c => c.vals[yi]),
+    }));
+    return { years, list: list.slice(0, 50), series,
+             cats: list.slice(0, 12).map(c => c.cli) };
+  }, [rows, effDim, valOf]);
 
   return (
     <div className="stat-wrap">
@@ -268,8 +296,9 @@ function SalesTab() {
         {measure === "margin" && (
           <div className="fhint" style={{ marginBottom: 8 }}>{t("stat_margin_note")}</div>
         )}
-        {yoy ? <YoYChart series={yoySeries} />
-             : <Chart data={chartData} type={ctype} fmtVal={fmtVal} />}
+        {yoy ? <GroupedBarChart cats={HONAPOK} series={yoySeries} />
+         : clientPivot ? <GroupedBarChart cats={clientPivot.cats} series={clientPivot.series} catAngle={-32} />
+         : <Chart data={chartData} type={ctype} fmtVal={fmtVal} />}
       </div>
 
       {/* adattábla */}
@@ -286,9 +315,9 @@ function SalesTab() {
               <thead><tr>
                 <th>Hónap</th>
                 {yoySeries.map(s => (
-                  <th key={s.year} style={{ textAlign: "right", color: s.color }}>{s.year}</th>
+                  <th key={s.name} style={{ textAlign: "right", color: s.color }}>{s.name}</th>
                 ))}
-                <th style={{ textAlign: "right" }}>Δ% ({yoySeries[yoySeries.length - 2]?.year}→{yoySeries[yoySeries.length - 1]?.year})</th>
+                <th style={{ textAlign: "right" }}>Δ% ({yoySeries[yoySeries.length - 2]?.name}→{yoySeries[yoySeries.length - 1]?.name})</th>
               </tr></thead>
               <tbody>
                 {HONAPOK.map((hn, mi) => {
@@ -299,8 +328,42 @@ function SalesTab() {
                     <tr key={hn}>
                       <td style={{ textTransform: "capitalize" }}>{hn}</td>
                       {yoySeries.map(s => (
-                        <td key={s.year} style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                        <td key={s.name} style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                           {s.vals[mi] != null ? fmtVal(s.vals[mi]!) : "—"}
+                        </td>
+                      ))}
+                      <td style={{ textAlign: "right" }}>
+                        {pct != null
+                          ? <span className={"pct-tag" + (pct >= 0 ? " pos" : " neg")}>{pct >= 0 ? "+" : ""}{pct}%</span>
+                          : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : clientPivot ? (
+            <table className="stat-table">
+              <thead><tr>
+                <th>{t("stat_client")}</th>
+                {clientPivot.years.map((y, yi) => (
+                  <th key={y} style={{ textAlign: "right", color: clientPivot.series[yi]?.color }}>{y}</th>
+                ))}
+                <th style={{ textAlign: "right" }}>
+                  Δ% ({clientPivot.years[clientPivot.years.length - 2]}→{clientPivot.years[clientPivot.years.length - 1]})
+                </th>
+              </tr></thead>
+              <tbody>
+                {clientPivot.list.map(c => {
+                  const prev = c.vals[c.vals.length - 2];
+                  const cur = c.vals[c.vals.length - 1];
+                  const pct = prev && cur != null ? Math.round(((cur - prev) / prev) * 100) : null;
+                  return (
+                    <tr key={c.cli}>
+                      <td style={{ maxWidth: 340, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.cli}</td>
+                      {c.vals.map((v, vi) => (
+                        <td key={vi} style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                          {v != null ? fmtVal(v) : "—"}
                         </td>
                       ))}
                       <td style={{ textAlign: "right" }}>
@@ -450,24 +513,28 @@ function CompareTab() {
   );
 }
 
-/* ══════════ Év/év összehasonlító vonaldiagram ══════════ */
-function YoYChart({ series }: {
-  series: { year: number; vals: (number | null)[]; color: string }[];
+/* ══════════ Csoportosított oszlopdiagram (év/év és ügyfél/év) ══════════ */
+function GroupedBarChart({ cats, series, catAngle = 0 }: {
+  cats: string[];
+  series: { name: string; vals: (number | null)[]; color: string }[];
+  catAngle?: number;
 }) {
-  const W = 1300, H = 430, padL = 70, padR = 16, padT = 66, padB = 40;
+  const W = 1300, H = catAngle ? 470 : 430, padL = 70, padR = 16, padT = 66,
+        padB = catAngle ? 86 : 40;
   const iw = W - padL - padR, ih = H - padT - padB;
   const allVals = series.flatMap(s => s.vals.filter((v): v is number => v != null));
   const max = Math.max(...allVals, 1);
   const yOf = (v: number) => padT + ih - (v / max) * ih;
   const ticks = 4;
+  const nSlots = Math.max(cats.length, 1);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 460 }}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: H + 40 }}>
       {/* jelmagyarázat */}
       {series.map((s, i) => (
-        <g key={s.year} transform={`translate(${padL + i * 90}, 12)`}>
+        <g key={s.name} transform={`translate(${padL + i * 90}, 12)`}>
           <line x1={0} y1={0} x2={22} y2={0} stroke={s.color} strokeWidth={2.5} />
-          <text x={28} y={4} fontSize={13} fontWeight={700} fill={s.color}>{s.year}</text>
+          <text x={28} y={4} fontSize={13} fontWeight={700} fill={s.color}>{s.name}</text>
         </g>
       ))}
       {/* rács */}
@@ -481,25 +548,26 @@ function YoYChart({ series }: {
           </g>
         );
       })}
-      {/* csoportosított oszlopok: hónaponként a 3 év egymás mellett */}
-      {HONAPOK.map((hn, m) => {
-        const slotW = iw / 12;
+      {/* csoportosított oszlopok */}
+      {cats.map((cat, m) => {
+        const slotW = iw / nSlots;
         const slotX = padL + m * slotW;
         const gap = 2;
-        const bw = Math.min(20, (slotW * 0.78 - gap * (series.length - 1)) / series.length);
+        const bw = Math.min(26, (slotW * 0.78 - gap * (series.length - 1)) / series.length);
         const groupW = bw * series.length + gap * (series.length - 1);
         const startX = slotX + (slotW - groupW) / 2;
+        const catLabel = cat.length > 22 ? cat.slice(0, 21) + "…" : cat;
         return (
-          <g key={hn}>
+          <g key={cat}>
             {series.map((s, si) => {
               const v = s.vals[m];
               if (v == null) return null;
               const x = startX + si * (bw + gap);
               const y = yOf(v);
               return (
-                <g key={s.year}>
+                <g key={s.name}>
                   <rect x={x} y={y} width={bw} height={padT + ih - y} rx={2} fill={s.color}>
-                    <title>{s.year} {hn}: {fmtMoney(v)}</title>
+                    <title>{s.name} · {cat}: {fmtMoney(v)}</title>
                   </rect>
                   <text x={x + bw / 2 + 3} y={y - 5} fontSize={8.5} fontWeight={700}
                         fill={s.color} textAnchor="start"
@@ -509,8 +577,16 @@ function YoYChart({ series }: {
                 </g>
               );
             })}
-            <text x={slotX + slotW / 2} y={H - padB + 18} fontSize={11}
-                  textAnchor="middle" fill="#647686">{hn}</text>
+            {catAngle ? (
+              <text x={slotX + slotW / 2} y={H - padB + 16} fontSize={10.5} fill="#647686"
+                    textAnchor="end"
+                    transform={`rotate(${catAngle} ${slotX + slotW / 2} ${H - padB + 16})`}>
+                {catLabel}
+              </text>
+            ) : (
+              <text x={slotX + slotW / 2} y={H - padB + 18} fontSize={11}
+                    textAnchor="middle" fill="#647686">{catLabel}</text>
+            )}
           </g>
         );
       })}
