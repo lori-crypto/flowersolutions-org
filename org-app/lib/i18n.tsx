@@ -176,7 +176,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   stat_no_data:     { hu: "Nincs adat a szűrőre.", ro: "Nu există date pentru filtru." },
   stat_margin_note: { hu: "* Az árrés csak ott számolható, ahol van beszerzési adat (a 2024-01 – 2026-08 közötti betöltött időszak); az API-ból frissülő friss hónapokra még nincs.", ro: "* Marja se calculează doar unde există preț de achiziție (perioada încărcată 2024-01 – 2026-08)." },
   stat_compare_hint:{ hu: "A hét a szállítási nappal kezdődik és a következő szállítási nap előtti napig tart. A rendelt = webshop-előrendelések; a számlázott = NEXUS valós számlák (ügyfél-párosítás NEXUS-azonosítón).", ro: "Săptămâna începe cu ziua de livrare. Comandat = precomenzi webshop; facturat = facturi reale NEXUS." },
-  stat_ordered:     { hu: "Rendelt (RON)", ro: "Comandat (RON)" },
+  stat_ordered:     { hu: "Rendelt (bruttó RON)", ro: "Comandat (brut RON)" },
   stat_invoiced_net:{ hu: "Számlázott nettó", ro: "Facturat net" },
   stat_invoiced_gross:{ hu: "Számlázott bruttó", ro: "Facturat brut" },
   stat_tab_progress:{ hu: "Haladás", ro: "Progres" },

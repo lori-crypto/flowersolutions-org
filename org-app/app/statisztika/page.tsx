@@ -574,7 +574,7 @@ function CompareTab() {
       {err && <div className="leave-err">{err}</div>}
 
       {weeks.map(([wk, w]) => {
-        const pct = diffPct(w.order, w.net);
+        const pct = diffPct(w.order, w.gross);
         return (
           <div className="stat-card" key={wk} style={{ padding: 0, overflow: "hidden" }}>
             <button className="week-head" onClick={() => setOpen(open === wk ? null : wk)}>
@@ -600,7 +600,7 @@ function CompareTab() {
                 </tr></thead>
                 <tbody>
                   {w.clients.sort((a, b) => b.nexus_net - a.nexus_net).map(c => {
-                    const p = diffPct(c.order_ron, c.nexus_net);
+                    const p = diffPct(c.order_ron, c.nexus_gross);
                     return (
                       <tr key={c.client}>
                         <td>{c.client}</td>
