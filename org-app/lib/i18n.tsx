@@ -179,6 +179,14 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   stat_ordered:     { hu: "Rendelt (RON)", ro: "Comandat (RON)" },
   stat_invoiced_net:{ hu: "Számlázott nettó", ro: "Facturat net" },
   stat_invoiced_gross:{ hu: "Számlázott bruttó", ro: "Facturat brut" },
+  stat_tab_progress:{ hu: "Haladás", ro: "Progres" },
+  prog_year:        { hu: "év — eddig", ro: "an — până azi" },
+  prog_week:        { hu: "Szállítási hét", ro: "Săptămâna de livrare" },
+  prog_vs_same:     { hu: "tavaly ugyaneddig", ro: "anul trecut până aici" },
+  prog_of_full:     { hu: "a tavalyi teljesből", ro: "din totalul de anul trecut" },
+  prog_left:        { hu: "a rekordig", ro: "până la record" },
+  prog_beat:        { hu: "Tavalyi teljes túlszárnyalva!", ro: "Recordul de anul trecut depășit!" },
+  prog_hint:        { hu: "Nettó (valós, kedvezmény utáni) értékek. A hét a szállítási nappal kezdődik; a tavalyi összevetés pontosan 364 nappal korábbi, azonos hosszú időszak — így a hétköznapok fedik egymást. A speciális időszakok (Valentin-nap, március 8. stb.) külön összevetése később, egyedi intervallumokkal kerül ide.", ro: "Valori nete reale. Săptămâna începe cu ziua de livrare; comparația e cu perioada de acum 364 de zile." },
 };
 
 type I18n = {

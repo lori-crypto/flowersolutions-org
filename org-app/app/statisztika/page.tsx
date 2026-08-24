@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { StatRow, CompareRow, statSales, statCompare, statOptions, getCycles } from "@/lib/stats";
+import { StatRow, CompareRow, ProgressRow, statSales, statCompare, statOptions, statProgress, getCycles } from "@/lib/stats";
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -39,7 +39,7 @@ export default function StatisztikaPage() {
   const { t, lang, setLang } = useI18n();
   const router = useRouter();
   const [isHr, setIsHr] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<"elado" | "compare">("elado");
+  const [tab, setTab] = useState<"haladas" | "elado" | "compare">("haladas");
 
   useEffect(() => {
     (async () => {
@@ -80,16 +80,102 @@ export default function StatisztikaPage() {
         <>
           <div className="leave-toolbar">
             <div className="board-chips">
+              <button className={"bchip" + (tab === "haladas" ? " on" : "")}
+                      onClick={() => setTab("haladas")}>{t("stat_tab_progress")}</button>
               <button className={"bchip" + (tab === "elado" ? " on" : "")}
                       onClick={() => setTab("elado")}>{t("stat_tab_sales")}</button>
               <button className={"bchip" + (tab === "compare" ? " on" : "")}
                       onClick={() => setTab("compare")}>{t("stat_tab_compare")}</button>
             </div>
           </div>
-          {tab === "elado" ? <SalesTab /> : <CompareTab />}
+          {tab === "haladas" ? <ProgressTab /> : tab === "elado" ? <SalesTab /> : <CompareTab />}
         </>
       )}
     </>
+  );
+}
+
+/* ══════════ HALADÁS (ösztönző kártyák) ══════════ */
+function ProgressTab() {
+  const { t } = useI18n();
+  const [rows, setRows] = useState<ProgressRow[] | null>(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try { setRows(await withAuthRetry(() => statProgress())); }
+      catch (e) { setErr((e as Error).message); }
+    })();
+  }, []);
+
+  if (err) return <div className="leave-err" style={{ margin: 14 }}>{err}</div>;
+  if (!rows) return <div className="center-msg">{t("loading")}</div>;
+
+  const fd = (s: string) =>
+    new Date(s + "T12:00:00").toLocaleDateString("hu-HU", { month: "short", day: "numeric" });
+  const addDays = (s: string, n: number) => {
+    const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const HK: Record<string, { icon: string; title: (r: ProgressRow) => string }> = {
+    year: { icon: "🗓", title: r => r.cur_from.slice(0, 4) + ". " + t("prog_year") },
+    month: {
+      icon: "📅",
+      title: r => new Date(r.cur_from + "T12:00:00").toLocaleDateString("hu-HU", { year: "numeric", month: "long" }),
+    },
+    week: {
+      icon: "🚚",
+      title: r => t("prog_week") + " (" + fd(r.cur_from) + " – " + fd(addDays(r.prev_full_to, 364)) + ")",
+    },
+  };
+  const order: ProgressRow["k"][] = ["week", "month", "year"];
+  const sorted = order.map(k => rows.find(r => r.k === k)).filter((r): r is ProgressRow => !!r);
+
+  return (
+    <div className="stat-wrap">
+      <div className="prog-grid">
+        {sorted.map(r => {
+          const pctSame = r.prev_same > 0 ? Math.round(((r.cur - r.prev_same) / r.prev_same) * 100) : null;
+          const pctFull = r.prev_full > 0 ? Math.round((r.cur / r.prev_full) * 100) : null;
+          const beat = pctFull != null && pctFull >= 100;
+          return (
+            <div className="prog-card" key={r.k}>
+              <div className="prog-title">{HK[r.k].icon} {HK[r.k].title(r)}</div>
+              <div className="prog-big">{fmtMoney(r.cur)} <span>RON</span></div>
+
+              <div className="prog-vs">
+                {pctSame != null && (
+                  <span className={"prog-pct" + (pctSame >= 0 ? " pos" : " neg")}>
+                    {pctSame >= 0 ? "▲ +" : "▼ "}{pctSame}%
+                  </span>
+                )}
+                <span className="muted">
+                  {t("prog_vs_same")} ({fd(r.prev_from)} – {fd(r.prev_same_to)}): <b>{fmtMoney(r.prev_same)}</b>
+                </span>
+              </div>
+
+              {pctFull != null && (
+                <>
+                  <div className="prog-bar">
+                    <div className={"prog-fill" + (beat ? " beat" : "")}
+                         style={{ width: Math.min(100, pctFull) + "%" }} />
+                  </div>
+                  <div className="prog-foot">
+                    {beat
+                      ? <b className="prog-beat">🎉 {t("prog_beat")} (+{fmtMoney(r.cur - r.prev_full)})</b>
+                      : <>
+                          <b>{pctFull}%</b> {t("prog_of_full")} ({fmtMoney(r.prev_full)}) ·{" "}
+                          {t("prog_left")}: <b>{fmtMoney(r.prev_full - r.cur)}</b>
+                        </>}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="fhint">{t("prog_hint")}</div>
+    </div>
   );
 }
 

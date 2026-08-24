@@ -40,6 +40,24 @@ export async function statCompare(from: string, to: string): Promise<CompareRow[
   }));
 }
 
+export type ProgressRow = {
+  k: "year" | "month" | "week";
+  cur_from: string; cur_to: string;
+  prev_from: string; prev_same_to: string; prev_full_to: string;
+  cur: number; prev_same: number; prev_full: number;
+};
+
+export async function statProgress(): Promise<ProgressRow[]> {
+  const { data, error } = await supabase.rpc("app_stat_progress");
+  fail(error);
+  return ((data as ProgressRow[]) ?? []).map(r => ({
+    ...r,
+    cur: Number(r.cur) || 0,
+    prev_same: Number(r.prev_same) || 0,
+    prev_full: Number(r.prev_full) || 0,
+  }));
+}
+
 export async function statOptions(): Promise<{ clients: string[]; grupak: string[] }> {
   const { data, error } = await supabase.rpc("app_stat_options");
   fail(error);
