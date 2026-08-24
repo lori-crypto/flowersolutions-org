@@ -39,9 +39,23 @@ begin
   from webshop_cycles c where c.delivery_date > w_start;
   if w_end_full is null then w_end_full := w_start + 6; end if;
 
-  lw_start := w_start - 364;
-  lw_same := lw_start + (today - w_start);
-  lw_end := lw_start + (w_end_full - w_start);
+  -- A TAVALYI hét határait a tavalyi TÉNYLEGES szállítási napok adják.
+  -- A szállítási napot a forgalmi csúcs jelzi (azon a napon sokszoros a
+  -- számlázás): a -364 nap ±3 napos környezetében a legnagyobb forgalmú nap
+  -- a hét kezdete; a következő csúcsnap (4-10 nappal később) előestéje a vége.
+  select s.data_doc into lw_start from sales_lines s
+  where s.tip_doc = 'Factura'
+    and s.data_doc between (w_start - 367) and (w_start - 361)
+  group by s.data_doc order by sum(s.real_net) desc limit 1;
+  if lw_start is null then lw_start := w_start - 364; end if;
+
+  select s.data_doc - 1 into lw_end from sales_lines s
+  where s.tip_doc = 'Factura'
+    and s.data_doc between (lw_start + 4) and (lw_start + 10)
+  group by s.data_doc order by sum(s.real_net) desc limit 1;
+  if lw_end is null then lw_end := lw_start + (w_end_full - w_start); end if;
+
+  lw_same := least(lw_start + (today - w_start), lw_end);
   return query
   select 'year'::text, y_start, today, ly_y_start, ly_date, ly_y_end,
     (select coalesce(sum(s.real_net),0) from sales_lines s
