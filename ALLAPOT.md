@@ -75,6 +75,17 @@ Utolsó frissítés: 2026-08-19
   helyi org-app/.env.local-ban megvannak), különben az éjszakai cron nem fut.
   **Következik: a BI/Statisztika felület megtervezése és megépítése.**
 
+- ✅ **Statisztika modul ÉL** (2026-08-24): Haladás főoldal (előrendelés-kártya
+  bruttón + hét/hónap/év vs tavaly, naptár-alapú hetekkel), Eladások BI
+  (év-gombok, év/év és ügyfél×év csoportosított oszlopok, gépelhető
+  ügyfél-kereső), Előrendelés vs számlázott (bruttó-bruttó Δ%).
+  NEXUS comenzi-szinkron 2 óránként (`/api/orders-sync`, 12,3 ezer rendelés
+  2024-től) → hiteles szállításinap-naptár (vasárnap/hétfő kis napok kizárva;
+  125 szerda + 15 csütörtök validálva). SQL: 11–16. A 📦 kártya akkor jelenik
+  meg, ha a köv. szállításra már van rendelés a NEXUS-ban.
+  Későbbre: speciális időszakok (Valentin, márc. 8.) egyedi intervallumokkal —
+  Lóri adja meg évenként; nexus-probe végpont eltávolítása, ha már nem kell.
+
 ## Későbbi modulok
 
 Pénzügy (NEXUS-szinkron), Projekt, HR, Irányelvek — lásd `TECHNIKAI_TERV.md`.
