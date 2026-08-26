@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 // A futó és az előző hónapot (anluna) teljesen újratölti az API-ból
 // (source: 'nexus_api'), mert a NEXUS-ban visszamenőleg is módosulhat számla.
 // A régebbi hónapok (nexus_export történelem) érintetlenek maradnak.
+// ?today=1 → GYORS mód: csak a MAI nap számláit cseréli (kézi frissítéshez).
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -67,6 +68,12 @@ export async function GET(req: NextRequest) {
   const db = supabaseAdmin();
   const report: Row[] = [];
 
+  // gyors mód: csak a mai (bukaresti) nap
+  const today = req.nextUrl.searchParams.get("today") === "1"
+    ? new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Bucharest" })
+    : null;
+  const months = today ? [today.slice(0, 4) + today.slice(5, 7)] : monthsToSync();
+
   // termék-hierarchia a kódokhoz
   const produse = await nexus("produse",
     { campuri: "cod_extern, den_grupa, den_clasa, den_subclasa" });
@@ -76,12 +83,13 @@ export async function GET(req: NextRequest) {
     if (c) prodMap.set(c, p);
   }
 
-  for (const anluna of monthsToSync()) {
+  for (const anluna of months) {
     // számlafejek — csak érvényes, nem sztornózott
     const headsAll = await nexus("facturi_clienti", { anluna });
     const heads = headsAll.filter(h =>
       String(h["validare"]).toLowerCase() !== "false" &&
-      String(h["anulare"]).toLowerCase() !== "true");
+      String(h["anulare"]).toLowerCase() !== "true" &&
+      (!today || String(h["data_document"] ?? "").slice(0, 10) === today));
     const byId = new Map<string, Row>();
     for (const h of heads) {
       const id = String(h["id_document"] ?? "");
@@ -90,12 +98,14 @@ export async function GET(req: NextRequest) {
 
     // sorok — a szerver néha ignorálja a szűrőt: helyben is szűrünk a fejekre
     let lines: Row[] = [];
-    try {
-      lines = await nexus("facturi_clienti_linii", { anluna });
-    } catch {
-      for (const id of byId.keys()) {
-        lines.push(...await nexus("facturi_clienti_linii",
-          { anluna, id_document: id }, 20000));
+    if (byId.size > 0) {
+      try {
+        lines = await nexus("facturi_clienti_linii", { anluna });
+      } catch {
+        for (const id of byId.keys()) {
+          lines.push(...await nexus("facturi_clienti_linii",
+            { anluna, id_document: id }, 20000));
+        }
       }
     }
     lines = lines.filter(l => byId.has(String(l["id_document"] ?? "")));
@@ -142,14 +152,16 @@ export async function GET(req: NextRequest) {
       };
     }).filter(r => r.data_doc && r.data_doc.length === 10);
 
-    // csere: az adott hónap MINDEN sora frissre cserélődik
-    const del = await db.from("sales_lines").delete().eq("anluna", anluna);
+    // csere: teljes hónap, gyors módban csak a mai nap sorai
+    const del = today
+      ? await db.from("sales_lines").delete().eq("anluna", anluna).eq("data_doc", today)
+      : await db.from("sales_lines").delete().eq("anluna", anluna);
     if (del.error) throw new Error("Törlés hiba: " + del.error.message);
     for (let i = 0; i < rows.length; i += 1000) {
       const ins = await db.from("sales_lines").insert(rows.slice(i, i + 1000));
       if (ins.error) throw new Error("Beszúrás hiba: " + ins.error.message);
     }
-    report.push({ anluna, szamlak: byId.size, sorok: rows.length });
+    report.push({ anluna, nap: today ?? "teljes hónap", szamlak: byId.size, sorok: rows.length });
   }
 
   return NextResponse.json({ ok: true, report });

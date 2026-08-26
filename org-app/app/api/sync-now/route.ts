@@ -26,21 +26,27 @@ export async function POST(req: NextRequest) {
   const secret = clean(process.env.CRON_SECRET);
   if (!secret) return NextResponse.json({ error: "hiányzó CRON_SECRET" }, { status: 500 });
 
+  // GYORS frissítés: csak a mai számlák + a futó hónap rendelései + webshop.
+  // (A teljes 2 hónapos újratöltést az éjszakai szinkron végzi.)
   const origin = req.nextUrl.origin;
   const out: Record<string, unknown> = {};
-  let ok = true;
-  for (const ep of ["orders-sync", "webshop-sync", "sales-sync"]) {
+  const errs: string[] = [];
+  for (const ep of ["orders-sync?quick=1", "webshop-sync", "sales-sync?today=1"]) {
+    const name = ep.split("?")[0];
     try {
       const r = await fetch(`${origin}/api/${ep}`, {
         headers: { Authorization: `Bearer ${secret}` },
         cache: "no-store",
       });
-      out[ep] = await r.json();
-      if (!r.ok) ok = false;
+      const j = await r.json();
+      out[name] = j;
+      if (!r.ok) errs.push(`${name}: ${j?.error ?? r.status}`);
     } catch (e) {
-      out[ep] = { error: String(e) };
-      ok = false;
+      out[name] = { error: String(e) };
+      errs.push(`${name}: ${String(e)}`);
     }
   }
-  return NextResponse.json({ ok, ...out }, { status: ok ? 200 : 502 });
+  const ok = errs.length === 0;
+  return NextResponse.json({ ok, error: ok ? undefined : errs.join(" • "), ...out },
+                           { status: ok ? 200 : 502 });
 }

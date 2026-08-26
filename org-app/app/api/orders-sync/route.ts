@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 // NEXUS vevői rendelések (comenzi_clienti) szinkronja.
-// Alapból a futó + előző hónap; ?full=1 → teljes visszatöltés 2024-01-től.
+// Alapból a futó + előző hónap; ?full=1 → teljes visszatöltés 2024-01-től;
+// ?quick=1 → csak a futó hónap (gyors, kézi frissítéshez).
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -34,10 +35,11 @@ const num = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-function monthList(full: boolean): string[] {
+function monthList(full: boolean, quick: boolean): string[] {
   const now = new Date();
+  const cur = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+  if (quick) return [cur];
   if (!full) {
-    const cur = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
     const p = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     return [`${p.getFullYear()}${String(p.getMonth() + 1).padStart(2, "0")}`, cur];
   }
@@ -58,7 +60,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const db = supabaseAdmin();
-  const months = monthList(req.nextUrl.searchParams.get("full") === "1");
+  const months = monthList(req.nextUrl.searchParams.get("full") === "1",
+                           req.nextUrl.searchParams.get("quick") === "1");
   const report: Row[] = [];
 
   for (const anluna of months) {
