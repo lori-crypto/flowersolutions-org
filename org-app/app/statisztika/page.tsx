@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
@@ -269,20 +269,26 @@ function SalesTab() {
   const multiYear = Number(to.slice(0, 4)) > Number(from.slice(0, 4));
   const effDim = dim === "client" && multiYear ? "client_year" : dim;
 
+  // futó kérések sorszáma: csak a legfrissebb kérés eredménye kerülhet a képernyőre
+  const reqId = useRef(0);
   const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true); setErr("");
     const years = yearSel ?? undefined;
     try {
       // szándékosan egymás után (nem párhuzamosan): a kis DB-gépen így stabilabb
       const r = await withAuthRetry(() => statSales({ from, to, dim: effDim, client, grupa, q, inv: measure === "invoices", years }));
+      if (id !== reqId.current) return; // közben új szűrés indult — ezt eldobjuk
       setRows(r);
       const tot = await withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q, inv: true, years }));
+      if (id !== reqId.current) return;
       setTotal(tot[0] ?? null);
-    } catch (e) { setErr((e as Error).message); }
-    setLoading(false);
+    } catch (e) { if (id === reqId.current) setErr((e as Error).message); }
+    if (id === reqId.current) setLoading(false);
   }, [from, to, yearSel, effDim, client, grupa, q, measure]);
 
-  useEffect(() => { load(); }, [load]);
+  // rövid késleltetés: gépelés közben ne induljon lekérdezés minden leütésre
+  useEffect(() => { const h = setTimeout(load, 300); return () => clearTimeout(h); }, [load]);
 
   // szűrő-opciók (könnyű lekérdezés, egyszer)
   useEffect(() => {
