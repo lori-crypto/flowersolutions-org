@@ -419,21 +419,28 @@ function SalesTab() {
                  onChange={e => setClient(e.target.value)}
                  style={{ paddingRight: 26 }} />
           {client && (
-            <button onClick={() => setClient("")}
-                    style={{ position: "absolute", right: 6, bottom: 7, border: "none",
-                             background: "none", cursor: "pointer", color: "var(--muted)" }}>×</button>
+            <button onClick={() => setClient("")} className="filter-x">×</button>
           )}
           <datalist id="stat-client-list">
             {clientOpts.map(c => <option key={c} value={c} />)}
           </datalist></div>
-        <div><label>{t("stat_grupa")}</label>
-          <select value={grupa} onChange={e => setGrupa(e.target.value)}>
+        <div style={{ position: "relative" }}><label>{t("stat_grupa")}</label>
+          <select value={grupa} onChange={e => setGrupa(e.target.value)}
+                  style={grupa ? { paddingRight: 38 } : undefined}>
             <option value="">{t("stat_all")}</option>
             {grupaOpts.map(g => <option key={g} value={g}>{g}</option>)}
-          </select></div>
-        <div style={{ flex: 1, minWidth: 140 }}><label>{t("stat_product")}</label>
+          </select>
+          {grupa && (
+            <button onClick={() => setGrupa("")} className="filter-x"
+                    style={{ right: 20 }}>×</button>
+          )}</div>
+        <div style={{ flex: 1, minWidth: 140, position: "relative" }}><label>{t("stat_product")}</label>
           <input type="text" list="stat-prod-list" value={q} placeholder="🔍"
-                 onChange={e => setQ(e.target.value)} />
+                 onChange={e => setQ(e.target.value)}
+                 style={{ paddingRight: 26, width: "100%" }} />
+          {q && (
+            <button onClick={() => { setQ(""); setProdOpts([]); }} className="filter-x">×</button>
+          )}
           <datalist id="stat-prod-list">
             {prodOpts.map(p => <option key={p} value={p} />)}
           </datalist></div>

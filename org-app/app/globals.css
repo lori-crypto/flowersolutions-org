@@ -347,6 +347,9 @@ body.editing .hint{display:block}
   padding:10px 14px; box-shadow:0 1px 4px rgba(20,30,50,.06)}
 .kpi-l{font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted)}
 .kpi-v{font-size:23px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:2px}
+.filter-x{position:absolute; right:6px; bottom:7px; border:none; background:none;
+  cursor:pointer; color:var(--muted); font-size:14px; line-height:1; padding:2px 4px}
+.filter-x:hover{color:var(--empty)}
 .kpi-yr{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-top:3px}
 .kpi-yr b{font-size:16px; font-weight:800; font-variant-numeric:tabular-nums}
 .kpi-yr .muted{font-size:12px}
