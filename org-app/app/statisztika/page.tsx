@@ -260,6 +260,7 @@ function SalesTab() {
 
   const [rows, setRows] = useState<StatRow[]>([]);
   const [total, setTotal] = useState<StatRow | null>(null);
+  const [yearTotals, setYearTotals] = useState<StatRow[]>([]);
   const [clientOpts, setClientOpts] = useState<string[]>([]);
   const [grupaOpts, setGrupaOpts] = useState<string[]>([]);
   const [prodOpts, setProdOpts] = useState<string[]>([]);
@@ -280,12 +281,21 @@ function SalesTab() {
       const r = await withAuthRetry(() => statSales({ from, to, dim: effDim, client, grupa, q, inv: measure === "invoices", years }));
       if (id !== reqId.current) return; // közben új szűrés indult — ezt eldobjuk
       setRows(r);
-      const tot = await withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q, inv: true, years }));
-      if (id !== reqId.current) return;
-      setTotal(tot[0] ?? null);
+      if (multiYear) {
+        // több év: a fejléc-kártyák évenkénti bontást mutatnak
+        const yt = await withAuthRetry(() => statSales({ from, to, dim: "year", client, grupa, q, inv: true, years }));
+        if (id !== reqId.current) return;
+        setYearTotals(yt);
+        setTotal(null);
+      } else {
+        const tot = await withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q, inv: true, years }));
+        if (id !== reqId.current) return;
+        setYearTotals([]);
+        setTotal(tot[0] ?? null);
+      }
     } catch (e) { if (id === reqId.current) setErr((e as Error).message); }
     if (id === reqId.current) setLoading(false);
-  }, [from, to, yearSel, effDim, client, grupa, q, measure]);
+  }, [from, to, yearSel, effDim, multiYear, client, grupa, q, measure]);
 
   // rövid késleltetés: gépelés közben ne induljon lekérdezés minden leütésre
   useEffect(() => { const h = setTimeout(load, 300); return () => clearTimeout(h); }, [load]);
@@ -437,18 +447,27 @@ function SalesTab() {
 
       {err && <div className="leave-err">{err}</div>}
 
-      {/* KPI-k */}
-      {total && (
+      {/* KPI-k — több kijelölt évnél évenkénti bontásban */}
+      {(total || yearTotals.length > 0) && (
         <div className="kpi-grid">
-          {[
-            { l: t("stat_kpi_net"), v: fmtMoney(total.net), c: "#2f7a4f" },
-            { l: t("stat_kpi_gross"), v: fmtMoney(total.gross), c: "#3b82f6" },
-            { l: t("stat_kpi_qty"), v: fmtInt(total.qty), c: "#f59e0b" },
-            { l: t("stat_kpi_inv"), v: fmtInt(total.invoices), c: "#8b5cf6" },
-          ].map(k => (
+          {([
+            { l: t("stat_kpi_net"), get: (r: StatRow) => r.net, fmt: fmtMoney, c: "#2f7a4f" },
+            { l: t("stat_kpi_gross"), get: (r: StatRow) => r.gross, fmt: fmtMoney, c: "#3b82f6" },
+            { l: t("stat_kpi_qty"), get: (r: StatRow) => r.qty, fmt: fmtInt, c: "#f59e0b" },
+            { l: t("stat_kpi_inv"), get: (r: StatRow) => r.invoices, fmt: fmtInt, c: "#8b5cf6" },
+          ] as const).map(k => (
             <div className="kpi-card" key={k.l}>
               <div className="kpi-l">{k.l}</div>
-              <div className="kpi-v" style={{ color: k.c }}>{k.v}</div>
+              {yearTotals.length > 0 ? (
+                yearTotals.map(y => (
+                  <div key={y.label} className="kpi-yr">
+                    <span className="muted">{y.label}</span>
+                    <b style={{ color: k.c }}>{k.fmt(k.get(y))}</b>
+                  </div>
+                ))
+              ) : (
+                <div className="kpi-v" style={{ color: k.c }}>{k.fmt(k.get(total!))}</div>
+              )}
             </div>
           ))}
         </div>
