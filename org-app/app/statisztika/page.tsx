@@ -249,6 +249,8 @@ function SalesTab() {
   const now = new Date();
   const [from, setFrom] = useState(`${now.getFullYear()}-01-01`);
   const [to, setTo] = useState(iso(now));
+  // kijelölt évek (több is pipálható); null = kézi dátumtartomány vagy "Mind"
+  const [yearSel, setYearSel] = useState<number[] | null>([now.getFullYear()]);
   const [client, setClient] = useState("");
   const [grupa, setGrupa] = useState("");
   const [q, setQ] = useState("");
@@ -268,15 +270,16 @@ function SalesTab() {
 
   const load = useCallback(async () => {
     setLoading(true); setErr("");
+    const years = yearSel ?? undefined;
     try {
       // szándékosan egymás után (nem párhuzamosan): a kis DB-gépen így stabilabb
-      const r = await withAuthRetry(() => statSales({ from, to, dim: effDim, client, grupa, q, inv: measure === "invoices" }));
+      const r = await withAuthRetry(() => statSales({ from, to, dim: effDim, client, grupa, q, inv: measure === "invoices", years }));
       setRows(r);
-      const tot = await withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q, inv: true }));
+      const tot = await withAuthRetry(() => statSales({ from, to, dim: "total", client, grupa, q, inv: true, years }));
       setTotal(tot[0] ?? null);
     } catch (e) { setErr((e as Error).message); }
     setLoading(false);
-  }, [from, to, effDim, client, grupa, q, measure]);
+  }, [from, to, yearSel, effDim, client, grupa, q, measure]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -359,24 +362,30 @@ function SalesTab() {
         <div><label>{lang === "ro" ? "An" : "Év"}</label>
           <div style={{ display: "flex", gap: 4 }}>
             {Array.from({ length: now.getFullYear() - 2023 }, (_, i) => 2024 + i).map(y => {
-              const yf = `${y}-01-01`;
-              const yt = y === now.getFullYear() ? iso(now) : `${y}-12-31`;
-              const on = from === yf && to === yt;
+              const on = yearSel?.includes(y) ?? false;
               return (
                 <button key={y} className={"bchip" + (on ? " on" : "")}
                         style={{ padding: "5px 10px" }}
-                        onClick={() => { setFrom(yf); setTo(yt); }}>{y}</button>
+                        onClick={() => {
+                          const next = on ? (yearSel ?? []).filter(x => x !== y)
+                                          : [...(yearSel ?? []), y].sort((a, b) => a - b);
+                          if (!next.length) return; // legalább egy év maradjon
+                          setYearSel(next);
+                          setFrom(`${next[0]}-01-01`);
+                          const last = next[next.length - 1];
+                          setTo(last === now.getFullYear() ? iso(now) : `${last}-12-31`);
+                        }}>{y}</button>
               );
             })}
-            <button className={"bchip" + (from === "2024-01-01" && to === iso(now) ? " on" : "")}
+            <button className={"bchip" + (yearSel === null && from === "2024-01-01" && to === iso(now) ? " on" : "")}
                     style={{ padding: "5px 10px" }}
-                    onClick={() => { setFrom("2024-01-01"); setTo(iso(now)); }}>{lang === "ro" ? "Toate" : "Mind"}</button>
+                    onClick={() => { setYearSel(null); setFrom("2024-01-01"); setTo(iso(now)); }}>{lang === "ro" ? "Toate" : "Mind"}</button>
           </div>
         </div>
         <div><label>{t("f_from")}</label>
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
+          <input type="date" value={from} onChange={e => { setYearSel(null); setFrom(e.target.value); }} /></div>
         <div><label>{t("f_to")}</label>
-          <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></div>
+          <input type="date" value={to} min={from} onChange={e => { setYearSel(null); setTo(e.target.value); }} /></div>
         <div style={{ position: "relative" }}><label>{t("stat_client")}</label>
           <input type="text" list="stat-client-list" value={client}
                  placeholder={"🔍 " + t("stat_all")}

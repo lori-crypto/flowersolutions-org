@@ -14,11 +14,13 @@ const fail = (e: { message?: string } | null) => { if (e) throw new Error(e.mess
 export async function statSales(p: {
   from: string; to: string; dim: string;
   client?: string; grupa?: string; q?: string; inv?: boolean;
+  years?: number[];
 }): Promise<StatRow[]> {
   const { data, error } = await supabase.rpc("app_stat_sales", {
     p_from: p.from, p_to: p.to, p_dim: p.dim,
     p_client: p.client || null, p_grupa: p.grupa || null, p_q: p.q || null,
     p_inv: !!p.inv,
+    p_years: p.years?.length ? p.years : null,
   });
   fail(error);
   return ((data as StatRow[]) ?? []).map(r => ({
