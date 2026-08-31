@@ -178,5 +178,5 @@ export async function GET(req: NextRequest) {
     report.push({ anluna, nap: today ?? "teljes hónap", szamlak: byId.size, sorok: rows.length });
   }
 
-  return NextResponse.json({ ok: true, report });
+  return NextResponse.json({ ok: true, v: 2, report });
 }
