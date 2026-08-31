@@ -7,7 +7,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 // A régebbi hónapok (nexus_export történelem) érintetlenek maradnak.
 // ?today=1 → GYORS mód: csak a MAI nap számláit cseréli (kézi frissítéshez).
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 const clean = (v?: string) => (v ?? "").trim().replace(/^["']+|["']+$/g, "");
@@ -53,7 +53,7 @@ function monthsToSync(): string[] {
   const cur = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
   const p = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prev = `${p.getFullYear()}${String(p.getMonth() + 1).padStart(2, "0")}`;
-  return [prev, cur];
+  return [cur, prev]; // a futó hónap az első: ha kifutnánk az időből, az frissüljön biztosan
 }
 
 export async function GET(req: NextRequest) {
@@ -152,14 +152,28 @@ export async function GET(req: NextRequest) {
       };
     }).filter(r => r.data_doc && r.data_doc.length === 10);
 
-    // csere: teljes hónap, gyors módban csak a mai nap sorai
-    const del = today
-      ? await db.from("sales_lines").delete().eq("anluna", anluna).eq("data_doc", today)
-      : await db.from("sales_lines").delete().eq("anluna", anluna);
-    if (del.error) throw new Error("Törlés hiba: " + del.error.message);
-    for (let i = 0; i < rows.length; i += 1000) {
-      const ins = await db.from("sales_lines").insert(rows.slice(i, i + 1000));
-      if (ins.error) throw new Error("Beszúrás hiba: " + ins.error.message);
+    // csere NAPONKÉNT: sosem törlünk többet, mint amit rögtön vissza is írunk —
+    // így egy időkorlát miatt félbeszakadt futás sem tud egész hónapot elrontani
+    const byDay = new Map<string, typeof rows>();
+    for (const r of rows) {
+      const a = byDay.get(r.data_doc) ?? []; a.push(r); byDay.set(r.data_doc, a);
+    }
+    if (today && !byDay.has(today)) byDay.set(today, []); // ma minden számlát sztornóztak
+    const days = Array.from(byDay.keys()).sort();
+    if (!today && days.length > 0) {
+      // napok, amikre a NEXUS-ban már egyetlen számla sincs, nálunk viszont van sor
+      const gone = await db.from("sales_lines").delete().eq("anluna", anluna)
+        .not("data_doc", "in", `(${days.join(",")})`);
+      if (gone.error) throw new Error("Nap-takarítás hiba: " + gone.error.message);
+    }
+    for (const day of days) {
+      const dayRows = byDay.get(day)!;
+      const del = await db.from("sales_lines").delete().eq("anluna", anluna).eq("data_doc", day);
+      if (del.error) throw new Error("Törlés hiba: " + del.error.message);
+      for (let i = 0; i < dayRows.length; i += 1000) {
+        const ins = await db.from("sales_lines").insert(dayRows.slice(i, i + 1000));
+        if (ins.error) throw new Error("Beszúrás hiba: " + ins.error.message);
+      }
     }
     report.push({ anluna, nap: today ?? "teljes hónap", szamlak: byId.size, sorok: rows.length });
   }
