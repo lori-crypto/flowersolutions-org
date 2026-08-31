@@ -72,6 +72,12 @@ export async function statOptions(): Promise<{ clients: string[]; grupak: string
   };
 }
 
+export async function statProductSearch(q: string): Promise<string[]> {
+  const { data, error } = await supabase.rpc("app_stat_product_search", { p_q: q });
+  fail(error);
+  return ((data as { label: string }[]) ?? []).map(r => r.label);
+}
+
 export type CompareWeek = {
   week: string; week_end: string; is_future: boolean;
   cur_order: number; cur_gross: number; cur_net: number;

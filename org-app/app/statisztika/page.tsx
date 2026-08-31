@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { StatRow, CompareRow, CompareWeek, ProgressRow, statSales, statCompare, statCompareWeeks, statOptions, statProgress, getCycles } from "@/lib/stats";
+import { StatRow, CompareRow, CompareWeek, ProgressRow, statSales, statCompare, statCompareWeeks, statOptions, statProgress, statProductSearch, getCycles } from "@/lib/stats";
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -262,6 +262,7 @@ function SalesTab() {
   const [total, setTotal] = useState<StatRow | null>(null);
   const [clientOpts, setClientOpts] = useState<string[]>([]);
   const [grupaOpts, setGrupaOpts] = useState<string[]>([]);
+  const [prodOpts, setProdOpts] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -293,6 +294,16 @@ function SalesTab() {
       } catch { /* opciók nélkül is működik */ }
     })();
   }, []);
+
+  // termék-javaslatok gépelés közben (rövid késleltetéssel, 2 karaktertől)
+  useEffect(() => {
+    if (q.trim().length < 2) { setProdOpts([]); return; }
+    const h = setTimeout(async () => {
+      try { setProdOpts(await withAuthRetry(() => statProductSearch(q.trim()))); }
+      catch { /* javaslatok nélkül is működik */ }
+    }, 300);
+    return () => clearTimeout(h);
+  }, [q]);
 
   const valOf = useCallback((r: StatRow): number =>
     measure === "net" ? r.net : measure === "gross" ? r.gross :
@@ -405,7 +416,11 @@ function SalesTab() {
             {grupaOpts.map(g => <option key={g} value={g}>{g}</option>)}
           </select></div>
         <div style={{ flex: 1, minWidth: 140 }}><label>{t("stat_product")}</label>
-          <input type="text" value={q} placeholder="🔍" onChange={e => setQ(e.target.value)} /></div>
+          <input type="text" list="stat-prod-list" value={q} placeholder="🔍"
+                 onChange={e => setQ(e.target.value)} />
+          <datalist id="stat-prod-list">
+            {prodOpts.map(p => <option key={p} value={p} />)}
+          </datalist></div>
         <button className="mini-btn" onClick={() => {
           setClient(""); setGrupa(""); setQ("");
         }}>{t("stat_clear")}</button>
