@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 // (source: 'nexus_api'), mert a NEXUS-ban visszamenőleg is módosulhat számla.
 // A régebbi hónapok (nexus_export történelem) érintetlenek maradnak.
 // ?today=1 → GYORS mód: csak a MAI nap számláit cseréli (kézi frissítéshez).
+// ?anluna=YYYYMM → csak a megadott hónap újratöltése (pl. visszamenőleges javítás).
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -72,7 +73,10 @@ export async function GET(req: NextRequest) {
   const today = req.nextUrl.searchParams.get("today") === "1"
     ? new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Bucharest" })
     : null;
-  const months = today ? [today.slice(0, 4) + today.slice(5, 7)] : monthsToSync();
+  const oneMonth = req.nextUrl.searchParams.get("anluna");
+  const months = today ? [today.slice(0, 4) + today.slice(5, 7)]
+    : /^\d{6}$/.test(oneMonth ?? "") ? [oneMonth!]
+    : monthsToSync();
 
   // termék-hierarchia a kódokhoz
   const produse = await nexus("produse",
@@ -115,6 +119,7 @@ export async function GET(req: NextRequest) {
       const cod = String(first(l["cod_extern_produs"], l["cod_produs"]) ?? "").trim();
       const p = prodMap.get(cod);
       const q = num(l["cantitate"]);
+      const puA = num(l["pret_achizitie"]); // beszerzési egységár — az árréshez
       const puNet = num(first(l["pret_vanzare"], l["pret_unitar"], l["pret"], l["pret_fara_tva"]));
       const puGross = num(first(l["pret_vanzare_tva"]));
       const cota = num(first(l["cota_tva_ies"], l["cota_tva"])) || 21;
@@ -143,8 +148,8 @@ export async function GET(req: NextRequest) {
         subclasa: p ? String(first(p["den_subclasa"], p["den_sub_clasa"]) ?? "").trim() || null : null,
         um: String(first(l["den_um"], l["um"]) ?? "").trim() || null,
         cantitate: q,
-        pu: null, puv: puNet,
-        val_pu: null,
+        pu: puA || null, puv: puNet,
+        val_pu: puA ? r2(q * puA) : null,
         val_puv: net, val_disc: 0, val_tva: Math.round((gross - net) * 100) / 100,
         val_puv_tva: gross,
         real_net: net, real_gross: gross,
