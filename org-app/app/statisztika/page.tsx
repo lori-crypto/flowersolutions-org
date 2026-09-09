@@ -40,6 +40,7 @@ const MEASURES = [
   { k: "qty", hu: "Mennyiség (db)", ro: "Cantitate (buc)" },
   { k: "invoices", hu: "Számlaszám", ro: "Nr. facturi" },
   { k: "margin", hu: "Árrés (RON)*", ro: "Marjă (RON)*" },
+  { k: "margin_pct", hu: "Árrés %*", ro: "Marjă %*" },
 ];
 const TYPES = [
   { k: "line", hu: "📈 Vonal", ro: "📈 Linie" },
@@ -324,18 +325,24 @@ function SalesTab() {
   const valOf = useCallback((r: StatRow): number =>
     measure === "net" ? r.net : measure === "gross" ? r.gross :
     measure === "qty" ? r.qty : measure === "invoices" ? r.invoices :
-    r.cost != null && r.cost > 0 ? r.net - r.cost : 0, [measure]);
+    measure === "margin_pct"
+      ? (r.cost != null && r.cost > 0 && r.net > 0
+          ? Math.round(((r.net - r.cost) / r.net) * 1000) / 10 : 0)
+      : r.cost != null && r.cost > 0 ? r.net - r.cost : 0, [measure]);
 
   const chartData = useMemo(() => {
     let arr = rows.map(r => ({ label: r.label, value: valOf(r) }));
-    if (measure === "margin") arr = arr.filter(x => x.value !== 0);
+    if (measure === "margin" || measure === "margin_pct") arr = arr.filter(x => x.value !== 0);
     if (dim === "day" || dim === "month" || dim === "year") arr.sort((a, b) => a.label.localeCompare(b.label));
     else { arr.sort((a, b) => b.value - a.value); arr = arr.slice(0, 30); }
     return arr;
   }, [rows, dim, measure, valOf]);
 
-  const isMoney = measure !== "qty" && measure !== "invoices";
-  const fmtVal = (v: number) => (isMoney ? fmtMoney(v) : fmtInt(v));
+  const isMoney = measure !== "qty" && measure !== "invoices" && measure !== "margin_pct";
+  const fmtVal = (v: number) =>
+    measure === "margin_pct"
+      ? v.toLocaleString("hu-HU", { maximumFractionDigits: 1 }) + "%"
+      : isMoney ? fmtMoney(v) : fmtInt(v);
   const dimLabel = DIMS.find(d => d.k === dim)?.[lang] ?? "";
   const measureLabel = MEASURES.find(m => m.k === measure)?.[lang] ?? "";
 
@@ -499,7 +506,7 @@ function SalesTab() {
             {measureLabel} · {dimLabel}{dim !== "day" && dim !== "month" ? " (top 30)" : ""}
           </span>
         </div>
-        {measure === "margin" && (
+        {(measure === "margin" || measure === "margin_pct") && (
           <div className="fhint" style={{ marginBottom: 8 }}>{t("stat_margin_note")}</div>
         )}
         {yoy ? <GroupedBarChart cats={months} series={yoySeries} />
