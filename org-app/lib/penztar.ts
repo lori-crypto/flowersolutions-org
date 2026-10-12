@@ -84,3 +84,50 @@ export async function cashMeta(): Promise<{
 }
 
 export const DENOMS = [500, 200, 100, 50, 10, 5, 1, 0.5, 0.1];
+
+export type LedgerEntry = {
+  entry_date: string; etype: "zaras" | "letet" | "koltseg" | "korrekcio";
+  unit_name: string | null; label: string; amount: number;
+  receipt_path: string | null; who: string | null; status: string | null; expl: string | null;
+};
+
+export async function cashBalance(): Promise<{ opening_balance: number; opening_date: string; balance: number }> {
+  const { data, error } = await supabase.rpc("app_cash_balance");
+  fail(error);
+  return data as { opening_balance: number; opening_date: string; balance: number };
+}
+
+export async function cashLedger(from: string, to: string): Promise<LedgerEntry[]> {
+  const { data, error } = await supabase.rpc("app_cash_ledger", { p_from: from, p_to: to });
+  fail(error);
+  return ((data as LedgerEntry[]) ?? []).map(r => ({ ...r, amount: Number(r.amount) || 0 }));
+}
+
+export async function cashQuickAdd(p: {
+  day: string; kind: "letet" | "koltseg" | "korrekcio"; amount: number;
+  unit?: string | null; category?: string | null; vehicle?: string | null;
+  client?: string | null; desc?: string | null; note?: string | null; receipt?: string | null;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc("app_cash_quick_add", {
+    p_day: p.day, p_kind: p.kind, p_amount: p.amount,
+    p_unit: p.unit || null, p_category: p.category || null, p_vehicle: p.vehicle || null,
+    p_client: p.client || null, p_desc: p.desc || null, p_note: p.note || null,
+    p_receipt: p.receipt || null,
+  });
+  fail(error);
+  return data as string;
+}
+
+export async function uploadReceipt(file: File): Promise<string> {
+  const safe = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_").slice(-60);
+  const path = `${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}-${safe}`;
+  const { error } = await supabase.storage.from("bizonylatok").upload(path, file);
+  fail(error);
+  return path;
+}
+
+export async function receiptUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from("bizonylatok").createSignedUrl(path, 120);
+  fail(error);
+  return data!.signedUrl;
+}

@@ -5,8 +5,9 @@ import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import {
-  CashUnit, CashCategory, CashVehicle, CashQuicklabel, DayPayload,
+  CashUnit, CashCategory, CashVehicle, CashQuicklabel, DayPayload, LedgerEntry,
   cashContext, cashSaveDay, cashCloseDay, cashMeta, DENOMS,
+  cashBalance, cashLedger, cashQuickAdd, uploadReceipt, receiptUrl,
 } from "@/lib/penztar";
 
 const fmt = (n: number) =>
@@ -27,6 +28,8 @@ export default function PenztarPage() {
   const [ctx, setCtx] = useState<{ today: string; units: CashUnit[] } | null>(null);
   const [meta, setMeta] = useState<{ categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] } | null>(null);
   const [unitId, setUnitId] = useState<string | null>(null);
+  const [isHr, setIsHr] = useState(false);
+  const [tab, setTab] = useState<"zaras" | "naplo">("zaras");
   const [err, setErr] = useState("");
   const [denied, setDenied] = useState(false);
 
@@ -45,6 +48,13 @@ export default function PenztarPage() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
+      const { data: me } = await supabase.from("persons")
+        .select("id").eq("user_id", session.user.id).maybeSingle();
+      const { data: caps } = await supabase.from("person_capabilities")
+        .select("person_id, capability");
+      const mine = new Set((caps ?? [])
+        .filter(c => c.person_id === me?.id).map(c => c.capability));
+      setIsHr(mine.has("hr") || mine.has("admin"));
       await reload();
     })();
   }, [router, reload]);
@@ -78,10 +88,21 @@ export default function PenztarPage() {
         <div className="leave-err" style={{ margin: 14 }}>{err}</div>
       ) : !ctx || !meta ? (
         <div className="center-msg">{t("loading")}</div>
-      ) : ctx.units.length === 0 ? (
+      ) : ctx.units.length === 0 && !isHr ? (
         <div className="center-msg">{t("pz_no_unit")}</div>
       ) : (
-        <div className="pz-wrap">
+        <div className="pz-wrap" style={tab === "naplo" ? { maxWidth: 980 } : undefined}>
+          {isHr && (
+            <div className="board-chips" style={{ marginBottom: 12 }}>
+              <button className={"bchip" + (tab === "zaras" ? " on" : "")}
+                      onClick={() => setTab("zaras")}>{t("pz_tab_zaras")}</button>
+              <button className={"bchip" + (tab === "naplo" ? " on" : "")}
+                      onClick={() => setTab("naplo")}>{t("pz_tab_naplo")}</button>
+            </div>
+          )}
+          {tab === "naplo" && isHr ? (
+            <NaploTab meta={meta} units={ctx.units} />
+          ) : (<>
           {ctx.units.length > 1 && (
             <div className="board-chips" style={{ marginBottom: 12 }}>
               {ctx.units.map(u => (
@@ -118,9 +139,252 @@ export default function PenztarPage() {
               <div className="fhint" style={{ marginTop: 10 }}>{t("pz_history_note")}</div>
             </div>
           )}
+          </>)}
         </div>
       )}
     </>
+  );
+}
+
+/* ══════════ NAPLÓ + EGYENLEG (vezetői) ══════════ */
+function isoWeek(ds: string): number {
+  const d = new Date(ds + "T12:00:00");
+  const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dn = (x.getUTCDay() + 6) % 7;
+  x.setUTCDate(x.getUTCDate() - dn + 3);
+  const f = new Date(Date.UTC(x.getUTCFullYear(), 0, 4));
+  return 1 + Math.round(((x.getTime() - f.getTime()) / 86400000 - 3 + ((f.getUTCDay() + 6) % 7)) / 7);
+}
+
+function NaploTab({ meta, units }: {
+  meta: { categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] };
+  units: CashUnit[];
+}) {
+  const { t, pick } = useI18n();
+  const now = new Date();
+  const [ym, setYm] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [bal, setBal] = useState<{ opening_balance: number; opening_date: string; balance: number } | null>(null);
+  const [rows, setRows] = useState<LedgerEntry[] | null>(null);
+  const [open, setOpen] = useState<number | null>(null);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    setErr("");
+    try {
+      const [y, m] = ym.split("-").map(Number);
+      const from = `${ym}-01`;
+      const to = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+      const [b, l] = [await withAuthRetry(() => cashBalance()), await withAuthRetry(() => cashLedger(from, to))];
+      setBal(b); setRows(l);
+    } catch (e) { setErr((e as Error).message); }
+  }, [ym]);
+  useEffect(() => { load(); }, [load]);
+
+  const shift = (d: number) => {
+    const [y, m] = ym.split("-").map(Number);
+    const n = new Date(y, m - 1 + d, 1);
+    setYm(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const weeks = useMemo(() => {
+    const map = new Map<number, LedgerEntry[]>();
+    for (const r of rows ?? []) {
+      const w = isoWeek(r.entry_date);
+      map.set(w, [...(map.get(w) ?? []), r]);
+    }
+    return [...map.entries()].sort((a, b) => b[0] - a[0]);
+  }, [rows]);
+
+  const monthIn = (rows ?? []).filter(r => r.amount > 0).reduce((s, r) => s + r.amount, 0);
+  const monthOut = (rows ?? []).filter(r => r.amount < 0).reduce((s, r) => s + r.amount, 0);
+
+  async function showReceipt(path: string) {
+    try { window.open(await receiptUrl(path), "_blank"); }
+    catch (e) { alert((e as Error).message); }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {err && <div className="leave-err">{err}</div>}
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-l">{t("pz_opening")} — {bal?.opening_date ?? ""}</div>
+          <div className="kpi-v">{bal ? fmt(bal.opening_balance) : "…"}</div>
+        </div>
+        <div className="kpi-card" style={{ background: "#1d5a33", borderColor: "#1d5a33" }}>
+          <div className="kpi-l" style={{ color: "#bfdcc9" }}>{t("pz_balance")}</div>
+          <div className="kpi-v" style={{ color: "#fff" }}>{bal ? fmt(bal.balance) : "…"}</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-l">{t("pz_month_in")}</div>
+          <div className="kpi-v" style={{ color: "#1d5a33" }}>+{fmt(monthIn)}</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-l">{t("pz_month_out")}</div>
+          <div className="kpi-v" style={{ color: "#b3431f" }}>{fmt(monthOut)}</div>
+        </div>
+      </div>
+
+      <QuickAdd meta={meta} units={units} onSaved={load} />
+
+      <div className="stat-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="stat-thead">
+          <button className="mini-btn" onClick={() => shift(-1)}>‹</button>
+          <span style={{ flex: 1, textAlign: "center" }}>{ym}</span>
+          <button className="mini-btn" onClick={() => shift(1)}>›</button>
+        </div>
+        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          {!rows ? <div className="muted">{t("loading")}</div> :
+            weeks.length === 0 ? <div className="muted" style={{ fontSize: 13 }}>{t("stat_no_data")}</div> :
+            weeks.map(([w, es]) => {
+              const win = es.filter(r => r.amount > 0).reduce((s, r) => s + r.amount, 0);
+              const wout = es.filter(r => r.amount < 0).reduce((s, r) => s + r.amount, 0);
+              const o = open === w;
+              return (
+                <div key={w} style={{ border: "1px solid #e2e8e3", borderRadius: 12, overflow: "hidden" }}>
+                  <button onClick={() => setOpen(o ? null : w)}
+                          style={{ width: "100%", border: "none", background: o ? "#eef6f0" : "none",
+                                   padding: "11px 14px", display: "flex", alignItems: "center", gap: 12,
+                                   cursor: "pointer", font: "inherit", textAlign: "left" }}>
+                    <b style={{ fontSize: 13.5 }}>{o ? "▾" : "▸"} {w}. {t("pz_week")}</b>
+                    <span style={{ flex: 1 }} />
+                    <span className="muted" style={{ fontSize: 12.5 }}>
+                      +{fmt(win)} · {fmt(wout)}
+                    </span>
+                  </button>
+                  {o && es.map((r, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10,
+                                          padding: "8px 14px", borderTop: "1px solid #f0f3f1", fontSize: 13 }}>
+                      <b style={{ width: 78 }}>{r.entry_date.slice(5)}</b>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span>{r.etype === "zaras" ? `${r.unit_name ?? ""} — ${t("pz_e_zaras")}` : r.label}</span>
+                        <span className="muted" style={{ marginLeft: 6, fontSize: 12 }}>
+                          {r.who ?? ""}{r.status === "nyitott" ? ` · ${t("pz_st_nyitott")}` : ""}
+                        </span>
+                        {r.expl && <div className="muted" style={{ fontSize: 12 }}>„{r.expl}"</div>}
+                      </div>
+                      {r.receipt_path && (
+                        <button className="mini-btn" onClick={() => showReceipt(r.receipt_path!)}>📎</button>
+                      )}
+                      <b style={{ fontVariantNumeric: "tabular-nums",
+                                  color: r.amount >= 0 ? "#1d5a33" : "#b3431f" }}>
+                        {r.amount >= 0 ? "+" : ""}{fmt(r.amount)}
+                      </b>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickAdd({ meta, units, onSaved }: {
+  meta: { categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] };
+  units: CashUnit[];
+  onSaved: () => Promise<void>;
+}) {
+  const { t, pick } = useI18n();
+  const today = new Date();
+  const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const [day, setDay] = useState(iso);
+  const [kind, setKind] = useState<"letet" | "koltseg" | "korrekcio">("letet");
+  const [amount, setAmount] = useState("");
+  const [unit, setUnit] = useState("");
+  const [cat, setCat] = useState("");
+  const [desc, setDesc] = useState("");
+  const [note, setNote] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  async function save() {
+    setBusy(true); setErr(""); setMsg("");
+    try {
+      const amt = num(amount);
+      if (!amt) throw new Error(t("pz_err_amount"));
+      let receipt: string | null = null;
+      if (file) receipt = await withAuthRetry(() => uploadReceipt(file));
+      await withAuthRetry(() => cashQuickAdd({
+        day, kind, amount: amt, unit: unit || null, category: cat || null,
+        desc: desc || null, note: note || null, receipt,
+      }));
+      setAmount(""); setDesc(""); setNote(""); setFile(null);
+      setMsg(t("pz_saved"));
+      await onSaved();
+    } catch (e) { setErr((e as Error).message); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="stat-card" style={{ borderColor: "#cfdfd5" }}>
+      <b style={{ fontSize: 14 }}>{t("pz_quick_title")}</b>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+        <label className="pz-field" style={{ width: 150 }}>
+          <span>{t("f_from")}</span>
+          <input type="date" value={day} onChange={e => setDay(e.target.value)} />
+        </label>
+        <label className="pz-field" style={{ flex: 1, minWidth: 180 }}>
+          <span>{t("f_type")}</span>
+          <select className="sel" value={kind}
+                  onChange={e => setKind(e.target.value as "letet" | "koltseg" | "korrekcio")}
+                  style={{ padding: "10px 12px", borderRadius: 10, border: "1.5px solid #cfd9d1" }}>
+            <option value="letet">{t("pz_k_letet")}</option>
+            <option value="koltseg">{t("pz_k_koltseg")}</option>
+            <option value="korrekcio">{t("pz_k_korrekcio")}</option>
+          </select>
+        </label>
+        <label className="pz-field" style={{ width: 140 }}>
+          <span>{t("pz_amount")}</span>
+          <input type="text" inputMode="decimal" value={amount} placeholder="0,00"
+                 onChange={e => setAmount(e.target.value)} style={{ textAlign: "right", fontWeight: 700 }} />
+        </label>
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+        {kind === "koltseg" && (
+          <label className="pz-field" style={{ minWidth: 170 }}>
+            <span>{t("pz_category")}</span>
+            <select className="sel" value={cat} onChange={e => setCat(e.target.value)}
+                    style={{ padding: "10px 12px", borderRadius: 10, border: "1.5px solid #cfd9d1" }}>
+              <option value="">—</option>
+              {meta.categories.map(c => <option key={c.id} value={c.id}>{pick(c.name_hu, c.name_ro ?? c.name_hu)}</option>)}
+            </select>
+          </label>
+        )}
+        <label className="pz-field" style={{ minWidth: 150 }}>
+          <span>{t("pz_unit_opt")}</span>
+          <select className="sel" value={unit} onChange={e => setUnit(e.target.value)}
+                  style={{ padding: "10px 12px", borderRadius: 10, border: "1.5px solid #cfd9d1" }}>
+            <option value="">—</option>
+            {units.map(u => <option key={u.id} value={u.id}>{pick(u.name_hu, u.name_ro ?? u.name_hu)}</option>)}
+          </select>
+        </label>
+        <label className="pz-field" style={{ flex: 1, minWidth: 180 }}>
+          <span>{t("pz_desc")}</span>
+          <input type="text" value={desc} onChange={e => setDesc(e.target.value)}
+                 placeholder={t("pz_quick_ph")} />
+        </label>
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10, alignItems: "flex-end" }}>
+        <label className="pz-field" style={{ flex: 1, minWidth: 200 }}>
+          <span>{t("f_note")}</span>
+          <input type="text" value={note} onChange={e => setNote(e.target.value)} />
+        </label>
+        <label className="mini-btn" style={{ cursor: "pointer", padding: "10px 14px" }}>
+          📎 {file ? file.name.slice(0, 22) : t("pz_receipt")}
+          <input type="file" accept="image/*,.pdf" style={{ display: "none" }}
+                 onChange={e => setFile(e.target.files?.[0] ?? null)} />
+        </label>
+        <button className="pz-close-btn" style={{ flex: "0 0 auto", padding: "11px 24px" }}
+                disabled={busy} onClick={save}>{busy ? "⏳" : t("pz_record")}</button>
+      </div>
+      {err && <div className="leave-err" style={{ marginTop: 10 }}>{err}</div>}
+      {msg && <div className="fhint" style={{ marginTop: 10, background: "#e6f2ea", color: "#1d5a33" }}>{msg}</div>}
+      <div className="fhint" style={{ marginTop: 10 }}>{t("pz_quick_hint")}</div>
+    </div>
   );
 }
 
