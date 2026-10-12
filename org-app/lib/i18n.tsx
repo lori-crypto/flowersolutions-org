@@ -184,6 +184,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   pz_editing_past:  { hu: "Korábbi nap szerkesztése", ro: "Editarea unei zile anterioare" },
   pz_back_today:    { hu: "Vissza a mai naphoz", ro: "Înapoi la ziua de azi" },
   pz_open_day:      { hu: "Megnyitás", ro: "Deschide" },
+  pz_reopen_confirm:{ hu: "Újranyitod a lezárt napot módosításra? A végén újra le kell zárni.", ro: "Redeschizi ziua închisă pentru modificare? La final trebuie închisă din nou." },
   pz_veh_del:       { hu: "Kiveszed a járművet a listából? (A régi tételeken megmarad.)", ro: "Scoți mașina din listă? (Rămâne pe înregistrările vechi.)" },
   pz_tab_naplo:     { hu: "Napló és egyenleg", ro: "Jurnal și sold" },
   pz_opening:       { hu: "Kezdő egyenleg", ro: "Sold inițial" },

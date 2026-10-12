@@ -159,11 +159,13 @@ export default function PenztarPage() {
               <ClosingForm key={"past" + editing.unit.id + editing.day + (editing.unit.today_day?.status ?? "")}
                            unit={editing.unit} meta={meta} today={editing.day}
                            editDay={editing.day}
+                           canReopen={editing.unit.kind === "lerakat" || isHr}
                            onChanged={async () => { await loadPast(editing.unit, editing.day); }} />
             </div>
           ) : unit && (
             <ClosingForm key={unit.id + (unit.today_day?.status ?? "")} unit={unit} meta={meta}
-                         today={ctx.today} onChanged={reload} />
+                         today={ctx.today} canReopen={unit.kind === "lerakat" || isHr}
+                         onChanged={reload} />
           )}
           {!editing && unit && unit.kind === "lerakat" && unit.history.length > 0 && (
             <div className="stat-card" style={{ marginTop: 14 }}>
@@ -446,11 +448,12 @@ function QuickAdd({ meta, units, onSaved }: {
   );
 }
 
-function ClosingForm({ unit, meta, today, editDay, onChanged }: {
+function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
   unit: CashUnit;
   meta: { categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] };
   today: string;
   editDay?: string;
+  canReopen?: boolean;
   onChanged: () => Promise<void>;
 }) {
   const { t, lang, pick } = useI18n();
@@ -577,6 +580,17 @@ function ClosingForm({ unit, meta, today, editDay, onChanged }: {
           : d?.status === "visszakuldve"
             ? <span className="pct-tag neg">{t("pz_st_visszakuldve")}</span>
             : <span className="acct-tag">{t("pz_st_nyitott")}</span>}
+        {locked && canReopen && (
+          <button className="mini-btn" disabled={busy} onClick={async () => {
+            if (!confirm(t("pz_reopen_confirm"))) return;
+            setBusy(true);
+            try {
+              await withAuthRetry(() => cashReopenDay(unit.id, editDay ?? today));
+              await onChanged();
+            } catch (e) { setErr((e as Error).message); }
+            setBusy(false);
+          }}>✎ {t("pz_open_day")}</button>
+        )}
       </div>
 
       {d?.status === "visszakuldve" && d.review_note && (
