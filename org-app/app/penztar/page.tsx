@@ -1416,8 +1416,24 @@ function HaviTab({ units }: { units: CashUnit[] }) {
     }
     return mm;
   }, [expenses]);
+  // egység+nap → kasszából fizetett költségek (a zárás tételei)
+  const attachedExp = useMemo(() => {
+    const mm = new Map<string, number>();
+    for (const e of expenses) {
+      if (!e.day_id || e.kind !== "koltseg") continue;
+      const u = (e as unknown as { unit_id: string | null }).unit_id;
+      if (!u) continue;
+      mm.set(u + "|" + e.day, (mm.get(u + "|" + e.day) ?? 0) + Number(e.amount || 0));
+    }
+    return mm;
+  }, [expenses]);
 
-  const cashOf = (u: CashUnit, day: string) => dmap.get(u.id + "|" + day)?.counted_cash ?? null;
+  // INKASSZÁLT érték: megszámolt pénz + aznap kasszából fizetett költségek
+  const cashOf = (u: CashUnit, day: string) => {
+    const d = dmap.get(u.id + "|" + day);
+    if (!d || d.counted_cash == null) return null;
+    return d.counted_cash + (attachedExp.get(u.id + "|" + day) ?? 0);
+  };
   const cardOf = (u: CashUnit, day: string) => dmap.get(u.id + "|" + day)?.pos_settlement ?? null;
 
   const colTotals = useMemo(() => {
