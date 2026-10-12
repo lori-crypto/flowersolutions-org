@@ -509,18 +509,33 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
     expenses.reduce((s, e) => s + num(e.amount), 0), [expenses]);
   const pendTotal = useMemo(() =>
     pending.reduce((s, p) => s + num(p.amount), 0), [pending]);
+  // lezárt napon: a záráskori sofőr-összeg a tárolt adatokból (a beérkezés után is stabil)
+  const pendOpenLocked = unit.pending_today.reduce((s, p) => s + p.amount, 0);
+  const pendAtClose = useMemo(() => {
+    if (!locked || !d || d.cash_diff == null) return null;
+    if (unit.kind === "lerakat") {
+      if (d.nexus_revenue == null) return null;
+      return Math.max(0, Math.round((d.nexus_revenue + d.cash_diff - counted - expTotal) * 100) / 100);
+    }
+    if (d.z_cash == null) return null;
+    const expected = d.z_cash - expTotal + num(floatM) - num(floatE);
+    return Math.max(0, Math.round((d.cash_diff + expected - counted) * 100) / 100);
+  }, [locked, d, unit.kind, counted, expTotal, floatM, floatE]);
+  const effPend = locked ? (pendAtClose ?? pendOpenLocked) : pendTotal;
+  const pendResolved = locked ? Math.max(0, Math.round(((pendAtClose ?? 0) - pendOpenLocked) * 100) / 100) : 0;
 
   const effNexus = unit.kind === "lerakat"
     ? (unit.nexus_today != null ? unit.nexus_today : (nexusRev ? num(nexusRev) : null))
     : null;
   const cashDiff = useMemo(() => {
+    if (locked && d?.cash_diff != null) return d.cash_diff;
     if (unit.kind === "bolt") {
       if (!zCash) return null;
-      return Math.round((counted + pendTotal - (num(zCash) - expTotal + num(floatM) - num(floatE))) * 100) / 100;
+      return Math.round((counted + effPend - (num(zCash) - expTotal + num(floatM) - num(floatE))) * 100) / 100;
     }
     if (effNexus == null) return null;
-    return Math.round((counted + expTotal + pendTotal - effNexus) * 100) / 100;
-  }, [unit.kind, counted, expTotal, pendTotal, zCash, floatM, floatE, effNexus]);
+    return Math.round((counted + expTotal + effPend - effNexus) * 100) / 100;
+  }, [locked, d, unit.kind, counted, expTotal, effPend, zCash, floatM, floatE, effNexus]);
   const cardDiff = useMemo(() =>
     zCard && pos ? Math.round((num(zCard) - num(pos)) * 100) / 100 : null, [zCard, pos]);
 
@@ -707,7 +722,7 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
       <div className="stat-card" style={pending.length || unit.pending_open.length ? { borderColor: "#eec6bd" } : undefined}>
         <div style={{ display: "flex", alignItems: "center" }}>
           <b style={{ fontSize: 13, color: "#5c6b61", flex: 1 }}>{t("pz_pending_title")}</b>
-          {pendTotal > 0 && <b style={{ fontVariantNumeric: "tabular-nums", color: "#b3431f" }}>{fmt(pendTotal)}</b>}
+          {effPend > 0 && <b style={{ fontVariantNumeric: "tabular-nums", color: "#b3431f" }}>{fmt(effPend)}</b>}
         </div>
         {unit.pending_open.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
@@ -723,6 +738,14 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
           </div>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+          {locked && pendResolved > 0.004 && (
+            <div className="pz-exp" style={{ borderColor: "#cfdfd5", background: "#eef6f0" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <b style={{ fontSize: 13.5, color: "#1d5a33" }}>{fmt(pendResolved)}</b>
+                <span className="muted" style={{ fontSize: 12.5, marginLeft: 8 }}>{t("pz_arrived")} ✓</span>
+              </div>
+            </div>
+          )}
           {locked
             ? unit.pending_today.map(p => (
                 <div key={p.id} className="pz-exp" style={{ borderColor: "#eec6bd", background: "#fdf1ee" }}>
@@ -827,10 +850,12 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}>
             <span className="muted">{t("pz_expenses")}</span><b>+ {fmt(expTotal)}</b>
           </div>
-          {pendTotal > 0 && (
+          {effPend > 0 && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}>
-              <span className="muted">{t("pz_pending_title")}</span>
-              <b style={{ color: "#b3431f" }}>+ {fmt(pendTotal)}</b>
+              <span className="muted">{t("pz_pending_title")}
+                {pendResolved > 0.004 && <span style={{ color: "#1d5a33" }}> ({t("pz_arrived")} ✓: {fmt(pendResolved)})</span>}
+              </span>
+              <b style={{ color: "#b3431f" }}>+ {fmt(effPend)}</b>
             </div>
           )}
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4, borderTop: "1px solid #edf1ee", paddingTop: 6 }}>
