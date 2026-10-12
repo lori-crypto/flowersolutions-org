@@ -173,7 +173,7 @@ function NaploTab({ meta, units }: {
   const { t, pick } = useI18n();
   const now = new Date();
   const [ym, setYm] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
-  const [bal, setBal] = useState<{ opening_balance: number; opening_date: string; balance: number } | null>(null);
+  const [bal, setBal] = useState<{ opening_balance: number; opening_date: string; balance: number; pending_open?: number } | null>(null);
   const [rows, setRows] = useState<LedgerEntry[] | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [err, setErr] = useState("");
