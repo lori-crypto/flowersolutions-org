@@ -163,20 +163,28 @@ export type OverviewDay = CashDay & {
   cash_units: { name_hu: string; name_ro: string | null; kind: string } | null;
 };
 
+export type OverviewPending = {
+  id: string; day_id: string | null; unit_id: string; day: string; amount: number; note: string | null;
+  status: "fuggoben" | "beerkezett"; resolved_day: string | null;
+};
+
 export async function cashOverview(from: string, to: string): Promise<{
   days: OverviewDay[]; expenses: (CashExpense & { day_id: string | null; day: string; kind: string })[];
+  pendings: OverviewPending[];
   persons: Map<string, string>;
 }> {
-  const [dQ, eQ, pQ] = await Promise.all([
+  const [dQ, eQ, cpQ, pQ] = await Promise.all([
     supabase.from("cash_days").select("*, cash_units(name_hu, name_ro, kind)")
       .gte("day", from).lte("day", to).order("day", { ascending: false }),
     supabase.from("cash_expenses").select("*").gte("day", from).lte("day", to),
+    supabase.from("cash_pending").select("*").gte("day", from).lte("day", to),
     supabase.from("persons").select("id, name"),
   ]);
-  fail(dQ.error); fail(eQ.error); fail(pQ.error);
+  fail(dQ.error); fail(eQ.error); fail(cpQ.error); fail(pQ.error);
   return {
     days: (dQ.data as unknown as OverviewDay[]) ?? [],
     expenses: (eQ.data as (CashExpense & { day_id: string | null; day: string; kind: string })[]) ?? [],
+    pendings: ((cpQ.data as OverviewPending[]) ?? []).map(p => ({ ...p, amount: Number(p.amount) || 0 })),
     persons: new Map(((pQ.data as { id: string; name: string }[]) ?? []).map(p => [p.id, p.name])),
   };
 }

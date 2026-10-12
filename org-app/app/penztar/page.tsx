@@ -983,6 +983,7 @@ function EllenorzesTab({ meta, units }: {
   const [unitF, setUnitF] = useState("");
   const [days, setDays] = useState<OverviewDay[] | null>(null);
   const [expenses, setExpenses] = useState<(CashExpense & { day_id: string | null; day: string; kind: string })[]>([]);
+  const [pendings, setPendings] = useState<import("@/lib/penztar").OverviewPending[]>([]);
   const [persons, setPersons] = useState<Map<string, string>>(new Map());
   const [open, setOpen] = useState<string | null>(null);
   const [monetar, setMonetar] = useState<{ denom: number; qty: number }[]>([]);
@@ -996,7 +997,7 @@ function EllenorzesTab({ meta, units }: {
       const from = `${ym}-01`;
       const to = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
       const o = await withAuthRetry(() => cashOverview(from, to));
-      setDays(o.days); setExpenses(o.expenses); setPersons(o.persons);
+      setDays(o.days); setExpenses(o.expenses); setPendings(o.pendings); setPersons(o.persons);
     } catch (e) { setErr((e as Error).message); }
   }, [ym]);
   useEffect(() => { load(); }, [load]);
@@ -1034,7 +1035,9 @@ function EllenorzesTab({ meta, units }: {
 
   function doPrint(d: OverviewDay) {
     const exps = expenses.filter(e => e.day_id === d.id);
-    printDay(d, monetar, exps, meta, persons, lang);
+    const pnds = pendings.filter(p => p.day_id === d.id || (p.unit_id === d.unit_id && p.day === d.day));
+    printDay(d, monetar, exps, meta, persons, lang,
+             pnds.map(p => ({ amount: p.amount, note: p.note })));
   }
 
   const shown = (days ?? []).filter(d => !unitF || d.unit_id === unitF);
@@ -1131,6 +1134,15 @@ function EllenorzesTab({ meta, units }: {
                           </div>
                         );
                       })}
+                      {pendings.filter(p => p.unit_id === d.unit_id && p.day === d.day).map(p => (
+                        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5,
+                                                 color: p.status === "fuggoben" ? "#b3431f" : "#1d5a33",
+                                                 fontWeight: 700 }}>
+                          <span>{t("pz_pending_title")}{p.note ? ` · ${p.note}` : ""}
+                            {p.status === "beerkezett" ? ` — ${t("pz_arrived")} ✓ (${p.resolved_day ?? ""})` : ` — ${t("pz_pending_bal")}`}</span>
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(p.amount)}</span>
+                        </div>
+                      ))}
                       {d.expl_cash && <div style={{ fontSize: 12.5, background: "#f6f8fb", borderRadius: 8, padding: "6px 9px" }}>KP: „{d.expl_cash}"</div>}
                       {d.expl_card && <div style={{ fontSize: 12.5, background: "#f6f8fb", borderRadius: 8, padding: "6px 9px" }}>{t("pz_card")}: „{d.expl_card}"</div>}
                       {d.review_note && <div style={{ fontSize: 12.5, color: "#b3431f" }}>{t("pz_review_note")}: {d.review_note}</div>}
@@ -1389,6 +1401,7 @@ function HaviTab({ units }: { units: CashUnit[] }) {
   const now = new Date();
   const [ym, setYm] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
   const [days, setDays] = useState<OverviewDay[] | null>(null);
+  const [pendings, setPendings] = useState<import("@/lib/penztar").OverviewPending[]>([]);
   const [expenses, setExpenses] = useState<(CashExpense & { day_id: string | null; day: string; kind: string })[]>([]);
   const [balStart, setBalStart] = useState<number | null>(null);
   const [balEnd, setBalEnd] = useState<number | null>(null);
@@ -1403,7 +1416,7 @@ function HaviTab({ units }: { units: CashUnit[] }) {
       const to = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
       const nextFirst = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
       const o = await withAuthRetry(() => cashOverview(from, to));
-      setDays(o.days); setExpenses(o.expenses);
+      setDays(o.days); setExpenses(o.expenses); setPendings(o.pendings);
       setBalStart(await withAuthRetry(() => cashBalanceAt(from)));
       setBalEnd(await withAuthRetry(() => cashBalanceAt(nextFirst)));
     } catch (e) { setErr((e as Error).message); }
@@ -1448,12 +1461,28 @@ function HaviTab({ units }: { units: CashUnit[] }) {
     return mm;
   }, [expenses]);
 
-  // INKASSZÁLT érték: megszámolt pénz + aznap kasszából fizetett költségek
+  // egység+nap → sofőr-tételek (összes / ebből még úton)
+  const pendByUnitDay = useMemo(() => {
+    const mm = new Map<string, { sum: number; open: number }>();
+    for (const p of pendings) {
+      const k = p.unit_id + "|" + p.day;
+      const a = mm.get(k) ?? { sum: 0, open: 0 };
+      a.sum += p.amount;
+      if (p.status === "fuggoben") a.open += p.amount;
+      mm.set(k, a);
+    }
+    return mm;
+  }, [pendings]);
+
+  // INKASSZÁLT érték: megszámolt pénz + kasszából fizetett költségek + sofőrnél lévő
   const cashOf = (u: CashUnit, day: string) => {
     const d = dmap.get(u.id + "|" + day);
     if (!d || d.counted_cash == null) return null;
-    return d.counted_cash + (attachedExp.get(u.id + "|" + day) ?? 0);
+    return d.counted_cash + (attachedExp.get(u.id + "|" + day) ?? 0)
+      + (pendByUnitDay.get(u.id + "|" + day)?.sum ?? 0);
   };
+  const openPendOf = (u: CashUnit, day: string) =>
+    pendByUnitDay.get(u.id + "|" + day)?.open ?? 0;
   const cardOf = (u: CashUnit, day: string) => dmap.get(u.id + "|" + day)?.pos_settlement ?? null;
 
   const colTotals = useMemo(() => {
@@ -1572,16 +1601,28 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                     <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{Number(day.slice(8))}</td>
                     {bolts.map(u => {
                       const c = cashOf(u, day); const k = cardOf(u, day);
+                      const op = openPendOf(u, day);
                       return (
                         <React.Fragment key={u.id}>
-                          <td style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>{c != null ? fmt(c) : ""}</td>
+                          <td style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>
+                            {c != null ? fmt(c) : ""}
+                            {op > 0 && <div style={{ fontSize: 10.5, color: "#b3431f", fontWeight: 700 }}>
+                              {t("pz_pending_bal")}: {fmt(op)}</div>}
+                          </td>
                           <td style={td}>{k != null ? fmt(k) : ""}</td>
                         </React.Fragment>
                       );
                     })}
                     {lerakats.map(u => {
                       const c = cashOf(u, day);
-                      return <td key={u.id} style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>{c != null ? fmt(c) : ""}</td>;
+                      const op = openPendOf(u, day);
+                      return (
+                        <td key={u.id} style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>
+                          {c != null ? fmt(c) : ""}
+                          {op > 0 && <div style={{ fontSize: 10.5, color: "#b3431f", fontWeight: 700 }}>
+                            {t("pz_pending_bal")}: {fmt(op)}</div>}
+                        </td>
+                      );
                     })}
                     <td style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>
                       {exp ? (
