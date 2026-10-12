@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   const resp = await fetch(`${host}/api/v3/read/incasari_plati`, {
     method: "POST",
     headers: { Authorization: basic, "Content-Type": "application/json" },
-    body: JSON.stringify({ campuri: "data_document, cont, suma, plata, validare" }),
+    body: JSON.stringify({ campuri: "data_document, cont, suma, plata, validare, tip_document, den_coresp" }),
     cache: "no-store",
   });
   const dj = await resp.json();
@@ -55,6 +55,19 @@ export async function GET(req: NextRequest) {
   const from = new Date(bucharest + "T12:00:00");
   from.setDate(from.getDate() - 7);
   const fromIso = from.toISOString().slice(0, 10);
+
+  // ?detail=ÉÉÉÉ-HH-NN → az adott nap tételeinek listája (felderítéshez)
+  const detail = req.nextUrl.searchParams.get("detail");
+  if (detail) {
+    const cont = String(units[0].nexus_cont).trim();
+    const list = rows
+      .filter(r => String(r["data_document"] ?? "").slice(0, 10) === detail)
+      .filter(r => String(r["cont"] ?? "").replace(/\s/g, "").startsWith(cont))
+      .filter(r => String(r["validare"]).toLowerCase() !== "false")
+      .map(r => ({ tip: r["tip_document"], plata: r["plata"], suma: num(r["suma"]),
+                   partner: String(r["den_coresp"] ?? "").trim() }));
+    return NextResponse.json({ ok: true, detail, tetelek: list });
+  }
 
   const report: Row[] = [];
   for (const u of units) {
