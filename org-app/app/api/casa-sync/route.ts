@@ -56,6 +56,22 @@ export async function GET(req: NextRequest) {
   from.setDate(from.getDate() - 7);
   const fromIso = from.toISOString().slice(0, 10);
 
+  // ?conts=ÉÉÉÉ-HH → a hónap kasszakódjai típusonként összegezve (felderítéshez)
+  const conts = req.nextUrl.searchParams.get("conts");
+  if (conts) {
+    const agg = new Map<string, { n: number; s: number }>();
+    for (const r of rows) {
+      const day = String(r["data_document"] ?? "").slice(0, 7);
+      if (day !== conts) continue;
+      if (String(r["validare"]).toLowerCase() === "false") continue;
+      const k = `${String(r["cont"] ?? "").replace(/\s/g, "")} | ${String(r["tip_document"] ?? "").trim()} | plata=${r["plata"]}`;
+      const a = agg.get(k) ?? { n: 0, s: 0 };
+      a.n += 1; a.s += num(r["suma"]); agg.set(k, a);
+    }
+    return NextResponse.json({ ok: true, honap: conts,
+      kodok: Object.fromEntries([...agg.entries()].map(([k, v]) => [k, { db: v.n, osszeg: Math.round(v.s * 100) / 100 }])) });
+  }
+
   // ?detail=ÉÉÉÉ-HH-NN → az adott nap tételeinek listája (felderítéshez)
   const detail = req.nextUrl.searchParams.get("detail");
   if (detail) {
