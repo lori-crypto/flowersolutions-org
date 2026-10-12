@@ -16,6 +16,7 @@ const CAPS = [
   { key: "hr", tk: "cap_hr" },
   { key: "tabla.szerkesztes", tk: "cap_tabla" },
   { key: "posztleiras.szerkesztes", tk: "cap_posztleiras" },
+  { key: "penztar", tk: "cap_penztar" },
 ];
 
 const AV_COLORS = ["#2f6fed", "#0e7c86", "#b3541e", "#2e7d32", "#8e3b8e", "#c2851a", "#1565c0", "#5b5f97"];
@@ -32,22 +33,28 @@ export default function KollegakPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [pcaps, setPcaps] = useState<{ person_id: string; capability: string }[]>([]);
+  const [cashUnits, setCashUnits] = useState<{ id: string; name_hu: string; name_ro: string | null; sort: number }[]>([]);
+  const [cashMembers, setCashMembers] = useState<{ unit_id: string; person_id: string }[]>([]);
   const [edit, setEdit] = useState<PersonRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [err, setErr] = useState("");
 
   const reload = useCallback(async () => await withAuthRetry(async () => {
-    const [pQ, bQ, mQ, cQ] = await Promise.all([
+    const [pQ, bQ, mQ, cQ, uQ, umQ] = await Promise.all([
       supabase.from("persons").select("*").order("active", { ascending: false }).order("name"),
       supabase.from("leave_boards").select("*").order("sort"),
       supabase.from("board_members").select("*"),
       supabase.from("person_capabilities").select("person_id, capability"),
+      supabase.from("cash_units").select("id, name_hu, name_ro, sort").eq("active", true).order("sort"),
+      supabase.from("cash_unit_members").select("unit_id, person_id"),
     ]);
     if (pQ.error) { setErr(pQ.error.message); return; }
     setPersons((pQ.data as PersonRow[]) ?? []);
     setBoards((bQ.data as LeaveBoard[]) ?? []);
     setMembers((mQ.data as BoardMember[]) ?? []);
     setPcaps((cQ.data as { person_id: string; capability: string }[]) ?? []);
+    setCashUnits((uQ.data as { id: string; name_hu: string; name_ro: string | null; sort: number }[]) ?? []);
+    setCashMembers((umQ.data as { unit_id: string; person_id: string }[]) ?? []);
   }), []);
 
   useEffect(() => {
@@ -66,6 +73,16 @@ export default function KollegakPage() {
       await reload();
     })();
   }, [router, reload]);
+
+  async function toggleCashUnit(p: PersonRow, unitId: string, on: boolean) {
+    const q = on
+      ? supabase.from("cash_unit_members").insert({ unit_id: unitId, person_id: p.id })
+      : supabase.from("cash_unit_members").delete()
+          .eq("unit_id", unitId).eq("person_id", p.id);
+    const { error } = await q;
+    if (error) { alert(error.message); }
+    await reload();
+  }
 
   async function toggleCap(p: PersonRow, cap: string, on: boolean) {
     const q = on
@@ -148,6 +165,21 @@ export default function KollegakPage() {
                                catch (ex) { alert((ex as Error).message); }
                              }} />
                       {pick(b.name_hu, b.name_ro)}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {isAdmin && p.active && cashUnits.length > 0 && (
+              <div className="person-boards">
+                <span className="muted">{t("p_cash_units")}:</span>
+                {cashUnits.map(u => {
+                  const on = cashMembers.some(m => m.person_id === p.id && m.unit_id === u.id);
+                  return (
+                    <label key={u.id} className="board-check">
+                      <input type="checkbox" checked={on}
+                             onChange={e => toggleCashUnit(p, u.id, e.target.checked)} />
+                      {pick(u.name_hu, u.name_ro ?? u.name_hu)}
                     </label>
                   );
                 })}

@@ -153,22 +153,42 @@ function ClosingForm({ unit, meta, today, onChanged }: {
   })));
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+
+  async function syncCasa() {
+    setSyncing(true); setErr("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Nincs bejelentkezés. / Nu ești autentificat.");
+      const r = await fetch("/api/casa-now", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Szinkron hiba");
+      await onChanged();
+    } catch (e) { setErr((e as Error).message); }
+    setSyncing(false);
+  }
 
   const counted = useMemo(() =>
     DENOMS.reduce((s, dn) => s + dn * (parseInt(qty[String(dn)] || "0", 10) || 0), 0), [qty]);
   const expTotal = useMemo(() =>
     expenses.reduce((s, e) => s + num(e.amount), 0), [expenses]);
 
+  const effNexus = unit.kind === "lerakat"
+    ? (unit.nexus_today != null ? unit.nexus_today : (nexusRev ? num(nexusRev) : null))
+    : null;
   const cashDiff = useMemo(() => {
     if (unit.kind === "bolt") {
       if (!zCash) return null;
       return Math.round((counted - (num(zCash) - expTotal + num(floatM) - num(floatE))) * 100) / 100;
     }
-    if (!nexusRev) return null;
-    return Math.round((counted + expTotal - num(nexusRev)) * 100) / 100;
-  }, [unit.kind, counted, expTotal, zCash, floatM, floatE, nexusRev]);
+    if (effNexus == null) return null;
+    return Math.round((counted + expTotal - effNexus) * 100) / 100;
+  }, [unit.kind, counted, expTotal, zCash, floatM, floatE, effNexus]);
   const cardDiff = useMemo(() =>
     zCard && pos ? Math.round((num(zCard) - num(pos)) * 100) / 100 : null, [zCard, pos]);
 
@@ -177,7 +197,7 @@ function ClosingForm({ unit, meta, today, onChanged }: {
       float_morning: unit.kind === "bolt" ? floatM : "",
       float_evening: unit.kind === "bolt" ? floatE : "",
       z_cash: zCash, z_card: zCard, pos_settlement: pos,
-      nexus_revenue: nexusRev,
+      nexus_revenue: unit.nexus_today != null ? String(unit.nexus_today) : nexusRev,
       expl_cash: explCash, expl_card: explCard,
       monetar: DENOMS.map(dn => ({ denom: dn, qty: parseInt(qty[String(dn)] || "0", 10) || 0 })),
       expenses: expenses.map(e => ({
@@ -231,13 +251,30 @@ function ClosingForm({ unit, meta, today, onChanged }: {
       {unit.kind === "lerakat" && (
         <div className="stat-card" style={{ borderColor: "#bcd8c6" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <b style={{ fontSize: 13, color: "#5c6b61" }}>{t("pz_nexus_rev")}</b>
-            <span className="acct-tag ok">{t("pz_nexus_manual_hint")}</span>
+            <b style={{ fontSize: 13, color: "#5c6b61", flex: 1 }}>{t("pz_nexus_rev")}</b>
+            {unit.nexus_today != null && (
+              <span className="acct-tag ok">NEXUS · {unit.nexus_synced_at ?? ""}</span>
+            )}
+            {!locked && (
+              <button className="mini-btn" disabled={syncing} onClick={syncCasa}>
+                {syncing ? "⏳" : "⟳"} {t("pz_casa_sync")}
+              </button>
+            )}
           </div>
-          <input type="text" inputMode="decimal" value={nexusRev} disabled={locked}
-                 onChange={e => setNexusRev(e.target.value)} placeholder="0,00"
-                 style={{ marginTop: 8, width: 180, border: "1.5px solid #cfd9d1", borderRadius: 10,
-                          padding: "10px 12px", fontSize: 18, fontWeight: 700, textAlign: "right" }} />
+          {unit.nexus_today != null ? (
+            <div style={{ marginTop: 8, fontSize: 28, fontWeight: 800, color: "#1d5a33",
+                          fontVariantNumeric: "tabular-nums" }}>
+              {fmt(unit.nexus_today)} <span style={{ fontSize: 14, color: "#6b7a70", fontWeight: 600 }}>RON</span>
+            </div>
+          ) : (
+            <>
+              <div className="fhint" style={{ marginTop: 8 }}>{t("pz_nexus_missing")}</div>
+              <input type="text" inputMode="decimal" value={nexusRev} disabled={locked}
+                     onChange={e => setNexusRev(e.target.value)} placeholder="0,00"
+                     style={{ marginTop: 8, width: 180, border: "1.5px solid #cfd9d1", borderRadius: 10,
+                              padding: "10px 12px", fontSize: 18, fontWeight: 700, textAlign: "right" }} />
+            </>
+          )}
         </div>
       )}
 
@@ -383,7 +420,7 @@ function ClosingForm({ unit, meta, today, onChanged }: {
             <span className="muted">{t("pz_expenses")}</span><b>+ {fmt(expTotal)}</b>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4, borderTop: "1px solid #edf1ee", paddingTop: 6 }}>
-            <span className="muted">{t("pz_nexus_rev")}</span><b>{fmt(num(nexusRev))}</b>
+            <span className="muted">{t("pz_nexus_rev")}</span><b>{fmt(effNexus ?? 0)}</b>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
             <b style={{ fontSize: 13 }}>{t("pz_diff")}</b>

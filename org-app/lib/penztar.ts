@@ -3,6 +3,8 @@ import { supabase } from "./supabaseClient";
 export type CashUnit = {
   id: string; code: string; name_hu: string; name_ro: string | null;
   kind: "bolt" | "lerakat"; sort: number;
+  nexus_today: number | null;
+  nexus_synced_at: string | null;
   today_day: CashDay | null;
   monetar: { denom: number; qty: number }[];
   expenses: CashExpense[];
