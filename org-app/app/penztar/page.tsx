@@ -723,17 +723,25 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
           </div>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-          {pending.map((p, i) => (
-            <div key={i} className="pz-exp">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <b style={{ fontSize: 13.5 }}>{fmt(num(p.amount))}</b>
-                {p.note && <span className="muted" style={{ fontSize: 12.5, marginLeft: 8 }}>{p.note}</span>}
-              </div>
-              {!locked && (
-                <button className="del" onClick={() => setPending(xs => xs.filter((_, j) => j !== i))}>✕</button>
-              )}
-            </div>
-          ))}
+          {locked
+            ? unit.pending_today.map(p => (
+                <div key={p.id} className="pz-exp" style={{ borderColor: "#eec6bd", background: "#fdf1ee" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b style={{ fontSize: 13.5, color: "#b3431f" }}>{fmt(p.amount)}</b>
+                    {p.note && <span className="muted" style={{ fontSize: 12.5, marginLeft: 8 }}>{p.note}</span>}
+                  </div>
+                  <button className="mini-btn" onClick={() => p.id && resolvePending(p.id)}>✓ {t("pz_arrived")}</button>
+                </div>
+              ))
+            : pending.map((p, i) => (
+                <div key={i} className="pz-exp">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b style={{ fontSize: 13.5 }}>{fmt(num(p.amount))}</b>
+                    {p.note && <span className="muted" style={{ fontSize: 12.5, marginLeft: 8 }}>{p.note}</span>}
+                  </div>
+                  <button className="del" onClick={() => setPending(xs => xs.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
         </div>
         {!locked && (
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>

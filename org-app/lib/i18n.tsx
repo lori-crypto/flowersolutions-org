@@ -167,7 +167,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   pz_pending_title: { hu: "Sofőrnél maradt pénz", ro: "Bani rămași la șofer" },
   pz_driver_note:   { hu: "Sofőr / megjegyzés", ro: "Șofer / observație" },
   pz_arrived:       { hu: "Beérkezett", ro: "A sosit" },
-  pz_pending_hint:  { hu: "A sofőrnél maradt pénz beszámít a mai egyeztetésbe, de pirossal függőben marad, amíg be nem érkezik. Másnap NE számold a monetárba — külön add le, és nyomd meg a Beérkezett gombot.", ro: "Banii rămași la șofer se iau în calcul azi, dar rămân în așteptare (roșu) până sosesc. A doua zi NU îi număra în monetar — predă-i separat și apasă butonul A sosit." },
+  pz_pending_hint:  { hu: "A sofőrnél maradt pénz beszámít a mai egyeztetésbe, de pirossal függőben marad, amíg be nem érkezik. Ha még ZÁRÁS ELŐTT megjön, töröld a tételt (✕) és számold a monetárba. Zárás után (akár aznap, akár másnap) NE számold a monetárba — külön add le, és nyomd meg a Beérkezett gombot.", ro: "Banii rămași la șofer se iau în calcul azi, dar rămân în așteptare (roșu) până sosesc. Dacă sosesc ÎNAINTE de închidere, șterge poziția (✕) și numără-i în monetar. După închidere (chiar și în aceeași zi) NU îi număra în monetar — predă-i separat și apasă butonul A sosit." },
   pz_client_hint:   { hu: "kezdj el gépelni — NEXUS ügyféltörzs", ro: "începe să tastezi — clienți NEXUS" },
   pz_scope:         { hu: "Ki használja", ro: "Cine o folosește" },
   pz_scope_mind:    { hu: "Mindenki (boltok + lerakat)", ro: "Toți (magazine + depozit)" },
