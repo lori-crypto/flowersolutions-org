@@ -1495,6 +1495,8 @@ function HaviTab({ units }: { units: CashUnit[] }) {
       tot[u.id + "c"] = dayList.reduce((s, d) => s + (cashOf(u, d) ?? 0), 0);
     }
     tot["exp"] = dayList.reduce((s, d) => s + (expByDay.get(d) ?? 0), 0);
+    tot["open"] = dayList.reduce((s, d) =>
+      s + units.reduce((s2, u) => s2 + (pendByUnitDay.get(u.id + "|" + d)?.open ?? 0), 0), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     return tot;
   }, [dmap, expByDay, ym]);
@@ -1584,7 +1586,11 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                   <td key={u.id} style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none" }}>{fmt(colTotals[u.id + "c"] ?? 0)}</td>
                 ))}
                 <td style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none", color: "#b3431f" }}>{fmt(colTotals["exp"] ?? 0)}</td>
-                <td style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none", color: "#1d5a33" }}>{fmt(grand - (colTotals["exp"] ?? 0))}</td>
+                <td style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none", color: "#1d5a33" }}>
+                  {fmt(grand - (colTotals["exp"] ?? 0) - (colTotals["open"] ?? 0))}
+                  {(colTotals["open"] ?? 0) > 0 && <div style={{ fontSize: 10.5, color: "#b3431f" }}>
+                    {t("pz_pending_bal")}: {fmt(colTotals["open"] ?? 0)}</div>}
+                </td>
               </tr>
             </thead>
             <tbody>
@@ -1593,8 +1599,9 @@ function HaviTab({ units }: { units: CashUnit[] }) {
               ) : dayList.map(day => {
                 const exp = expByDay.get(day) ?? 0;
                 let rowSum = 0;
-                for (const u of bolts) rowSum += (cashOf(u, day) ?? 0) + (cardOf(u, day) ?? 0);
-                for (const u of lerakats) rowSum += cashOf(u, day) ?? 0;
+                let rowOpen = 0;
+                for (const u of bolts) { rowSum += (cashOf(u, day) ?? 0) + (cardOf(u, day) ?? 0); rowOpen += openPendOf(u, day); }
+                for (const u of lerakats) { rowSum += cashOf(u, day) ?? 0; rowOpen += openPendOf(u, day); }
                 const empty = rowSum === 0 && exp === 0;
                 return (
                   <tr key={day} style={empty ? { color: "#b6beb9" } : undefined}>
@@ -1636,7 +1643,7 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                       ) : ""}
                     </td>
                     <td style={{ ...td, borderLeft: "1px solid #f0f3f1", fontWeight: 700 }}>
-                      {empty ? "" : fmt(rowSum - exp)}
+                      {empty ? "" : fmt(rowSum - exp - rowOpen)}
                     </td>
                   </tr>
                 );
