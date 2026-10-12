@@ -204,6 +204,7 @@ export default function SzabadsagPage() {
           <Link href="/kollegak">{t("nav_people")}</Link>
           <Link href="/posztleirasok">{t("nav_desc")}</Link>
           <Link href="/statisztika">{t("nav_stat")}</Link>
+          <Link href="/penztar">{t("nav_penztar")}</Link>
         </nav>
         <span className="sp" />
         <button className="lang-btn" title="Frissítés" onClick={() => window.location.reload()}>↻</button>

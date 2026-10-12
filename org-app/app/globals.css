@@ -487,6 +487,28 @@ body.editing .hint{display:block}
   .lang-btn{padding:5px 10px}
 }
 
+/* ── pénztár ──────────────────────────────────────────────── */
+.pz-wrap{max-width:720px; margin:0 auto; padding:14px 14px 60px}
+.pz-field{display:flex; flex-direction:column; gap:4px}
+.pz-field span{font-size:11px; font-weight:700; color:#8a968d; text-transform:uppercase; letter-spacing:.05em}
+.pz-field input, .pz-field textarea{border:1.5px solid #cfd9d1; border-radius:10px; padding:10px 12px;
+  font:inherit; font-size:15px; width:100%; box-sizing:border-box}
+.pz-field input:disabled{background:#f4f6f4; color:#6b7a70}
+.pz-mrow{display:flex; align-items:center; gap:9px}
+.pz-mrow input{width:62px; box-sizing:border-box; border:1.5px solid #cfd9d1; border-radius:10px;
+  padding:9px 8px; font:inherit; font-size:16px; font-weight:700; text-align:center}
+.pz-mrow input:disabled{background:#f4f6f4; color:#6b7a70}
+.pz-dots{flex:1; border-bottom:1px dashed #dde4de}
+.pz-total{display:flex; align-items:center; justify-content:space-between; background:#eef6f0;
+  border-radius:12px; padding:12px 14px; margin-top:10px; color:#1d5a33}
+.pz-total b{font-size:19px; font-variant-numeric:tabular-nums}
+.pz-exp{display:flex; align-items:center; gap:10px; border:1px solid #edf1ee; border-radius:12px; padding:9px 12px}
+.pz-chip{background:#f0f4f1; color:#42504a; font-size:11px; font-weight:700; border-radius:99px; padding:2px 9px}
+.pz-hist{display:flex; align-items:center; gap:10px; border:1px solid #edf1ee; border-radius:12px; padding:10px 12px}
+.pz-close-btn{flex:2; border:none; background:#2f7a4f; color:#fff; border-radius:12px; padding:13px;
+  font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 4px 14px rgba(47,122,79,.3)}
+.pz-close-btn:disabled{opacity:.6}
+
 /* ── telefon: fejléc + statisztika ────────────────────────── */
 @media (max-width:700px){
   /* fejléc: cím + gombok felül, a menü alatta egy csúsztatható sorban */

@@ -95,6 +95,7 @@ export default function StatisztikaPage() {
           <Link href="/kollegak">{t("nav_people")}</Link>
           <Link href="/posztleirasok">{t("nav_desc")}</Link>
           <Link href="/statisztika" className="active">{t("nav_stat")}</Link>
+          <Link href="/penztar">{t("nav_penztar")}</Link>
         </nav>
         <span className="sp" />
         {isHr && (

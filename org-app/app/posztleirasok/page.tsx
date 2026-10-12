@@ -64,6 +64,7 @@ export default function PosztleirasokPage() {
           <Link href="/kollegak">{t("nav_people")}</Link>
           <Link href="/posztleirasok" className="active">{t("nav_desc")}</Link>
           <Link href="/statisztika">{t("nav_stat")}</Link>
+          <Link href="/penztar">{t("nav_penztar")}</Link>
         </nav>
         <span className="sp" />
         <button className="lang-btn" onClick={() => window.location.reload()}>↻</button>
