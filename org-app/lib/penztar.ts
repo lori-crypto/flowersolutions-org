@@ -5,6 +5,8 @@ export type CashUnit = {
   kind: "bolt" | "lerakat"; sort: number;
   nexus_today: number | null;
   nexus_synced_at: string | null;
+  pending_today: PendingItem[];
+  pending_open: PendingItem[];
   today_day: CashDay | null;
   monetar: { denom: number; qty: number }[];
   expenses: CashExpense[];
@@ -32,7 +34,9 @@ export type CashCategory = {
   id: string; name_hu: string; name_ro: string | null;
   req_vehicle: boolean; req_client: boolean; req_desc: boolean; req_photo: boolean;
   staff_can_use: boolean; approved: boolean; active: boolean; sort: number;
+  scope: "mind" | "bolt" | "lerakat";
 };
+export type PendingItem = { id?: string; amount: number; note: string | null; day?: string };
 export type CashVehicle = { id: string; plate: string; name: string | null; active: boolean };
 export type CashQuicklabel = { id: string; category_id: string; label: string };
 
@@ -52,6 +56,7 @@ export type DayPayload = {
   monetar: { denom: number; qty: number }[];
   expenses: { amount: number; category_id: string | null; vehicle_id: string | null;
               client_name: string | null; description: string | null }[];
+  pending: { amount: number; note: string | null }[];
 };
 
 export async function cashSaveDay(unitId: string, payload: DayPayload): Promise<string> {
@@ -92,10 +97,12 @@ export type LedgerEntry = {
   receipt_path: string | null; who: string | null; status: string | null; expl: string | null;
 };
 
-export async function cashBalance(): Promise<{ opening_balance: number; opening_date: string; balance: number }> {
+export async function cashBalance(): Promise<{
+  opening_balance: number; opening_date: string; balance: number; pending_open?: number;
+}> {
   const { data, error } = await supabase.rpc("app_cash_balance");
   fail(error);
-  return data as { opening_balance: number; opening_date: string; balance: number };
+  return data as { opening_balance: number; opening_date: string; balance: number; pending_open?: number };
 }
 
 export async function cashLedger(from: string, to: string): Promise<LedgerEntry[]> {
@@ -160,6 +167,17 @@ export async function cashReview(dayId: string, action: "elfogad" | "visszakuld"
   const { error } = await supabase.rpc("app_cash_review", {
     p_day_id: dayId, p_action: action, p_note: note || null,
   });
+  fail(error);
+}
+
+export async function cashClients(q: string): Promise<string[]> {
+  const { data, error } = await supabase.rpc("app_cash_clients", { p_q: q });
+  fail(error);
+  return ((data as { label: string }[]) ?? []).map(r => r.label);
+}
+
+export async function cashPendingResolve(id: string): Promise<void> {
+  const { error } = await supabase.rpc("app_cash_pending_resolve", { p_id: id });
   fail(error);
 }
 

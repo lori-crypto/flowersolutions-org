@@ -9,6 +9,7 @@ import {
   cashContext, cashSaveDay, cashCloseDay, cashMeta, DENOMS,
   cashBalance, cashLedger, cashQuickAdd, uploadReceipt, receiptUrl,
   cashOverview, cashMonetarOf, cashReview, CashExpense,
+  cashClients, cashPendingResolve, PendingItem,
 } from "@/lib/penztar";
 
 const fmt = (n: number) =>
@@ -223,6 +224,11 @@ function NaploTab({ meta, units }: {
         <div className="kpi-card" style={{ background: "#1d5a33", borderColor: "#1d5a33" }}>
           <div className="kpi-l" style={{ color: "#bfdcc9" }}>{t("pz_balance")}</div>
           <div className="kpi-v" style={{ color: "#fff" }}>{bal ? fmt(bal.balance) : "…"}</div>
+          {bal != null && (bal.pending_open ?? 0) > 0 && (
+            <div style={{ fontSize: 11.5, color: "#f5c6b8", marginTop: 2 }}>
+              + {fmt(bal.pending_open!)} {t("pz_pending_bal")}
+            </div>
+          )}
         </div>
         <div className="kpi-card">
           <div className="kpi-l">{t("pz_month_in")}</div>
@@ -424,6 +430,10 @@ function ClosingForm({ unit, meta, today, onChanged }: {
     amount: String(e.amount), category_id: e.category_id ?? "", vehicle_id: e.vehicle_id ?? "",
     client_name: e.client_name ?? "", description: e.description ?? "",
   })));
+  const [pending, setPending] = useState<{ amount: string; note: string }[]>(
+    unit.pending_today.map(p => ({ amount: String(p.amount), note: p.note ?? "" })));
+  const [pAmount, setPAmount] = useState("");
+  const [pNote, setPNote] = useState("");
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -450,6 +460,8 @@ function ClosingForm({ unit, meta, today, onChanged }: {
     DENOMS.reduce((s, dn) => s + dn * (parseInt(qty[String(dn)] || "0", 10) || 0), 0), [qty]);
   const expTotal = useMemo(() =>
     expenses.reduce((s, e) => s + num(e.amount), 0), [expenses]);
+  const pendTotal = useMemo(() =>
+    pending.reduce((s, p) => s + num(p.amount), 0), [pending]);
 
   const effNexus = unit.kind === "lerakat"
     ? (unit.nexus_today != null ? unit.nexus_today : (nexusRev ? num(nexusRev) : null))
@@ -457,11 +469,11 @@ function ClosingForm({ unit, meta, today, onChanged }: {
   const cashDiff = useMemo(() => {
     if (unit.kind === "bolt") {
       if (!zCash) return null;
-      return Math.round((counted - (num(zCash) - expTotal + num(floatM) - num(floatE))) * 100) / 100;
+      return Math.round((counted + pendTotal - (num(zCash) - expTotal + num(floatM) - num(floatE))) * 100) / 100;
     }
     if (effNexus == null) return null;
-    return Math.round((counted + expTotal - effNexus) * 100) / 100;
-  }, [unit.kind, counted, expTotal, zCash, floatM, floatE, effNexus]);
+    return Math.round((counted + expTotal + pendTotal - effNexus) * 100) / 100;
+  }, [unit.kind, counted, expTotal, pendTotal, zCash, floatM, floatE, effNexus]);
   const cardDiff = useMemo(() =>
     zCard && pos ? Math.round((num(zCard) - num(pos)) * 100) / 100 : null, [zCard, pos]);
 
@@ -478,7 +490,13 @@ function ClosingForm({ unit, meta, today, onChanged }: {
         vehicle_id: e.vehicle_id || null, client_name: e.client_name || null,
         description: e.description || null,
       })),
+      pending: pending.map(p => ({ amount: num(p.amount), note: p.note || null })),
     };
+  }
+
+  async function resolvePending(id: string) {
+    try { await withAuthRetry(() => cashPendingResolve(id)); await onChanged(); }
+    catch (e) { alert((e as Error).message); }
   }
 
   async function save(closeToo: boolean) {
@@ -628,6 +646,57 @@ function ClosingForm({ unit, meta, today, onChanged }: {
         )}
       </div>
 
+      <div className="stat-card" style={pending.length || unit.pending_open.length ? { borderColor: "#eec6bd" } : undefined}>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <b style={{ fontSize: 13, color: "#5c6b61", flex: 1 }}>{t("pz_pending_title")}</b>
+          {pendTotal > 0 && <b style={{ fontVariantNumeric: "tabular-nums", color: "#b3431f" }}>{fmt(pendTotal)}</b>}
+        </div>
+        {unit.pending_open.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+            {unit.pending_open.map(p => (
+              <div key={p.id} className="pz-exp" style={{ borderColor: "#eec6bd", background: "#fdf1ee" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <b style={{ fontSize: 13.5, color: "#b3431f" }}>{p.day} · {fmt(p.amount)}</b>
+                  {p.note && <div className="muted" style={{ fontSize: 12 }}>{p.note}</div>}
+                </div>
+                <button className="mini-btn" onClick={() => p.id && resolvePending(p.id)}>✓ {t("pz_arrived")}</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+          {pending.map((p, i) => (
+            <div key={i} className="pz-exp">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <b style={{ fontSize: 13.5 }}>{fmt(num(p.amount))}</b>
+                {p.note && <span className="muted" style={{ fontSize: 12.5, marginLeft: 8 }}>{p.note}</span>}
+              </div>
+              {!locked && (
+                <button className="del" onClick={() => setPending(xs => xs.filter((_, j) => j !== i))}>✕</button>
+              )}
+            </div>
+          ))}
+        </div>
+        {!locked && (
+          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            <input type="text" inputMode="decimal" value={pAmount} placeholder={t("pz_amount")}
+                   onChange={e => setPAmount(e.target.value)}
+                   style={{ width: 110, border: "1.5px solid #cfd9d1", borderRadius: 10, padding: "9px 10px",
+                            font: "inherit", fontWeight: 700, textAlign: "right" }} />
+            <input type="text" value={pNote} placeholder={t("pz_driver_note")}
+                   onChange={e => setPNote(e.target.value)}
+                   style={{ flex: 1, minWidth: 140, border: "1.5px solid #cfd9d1", borderRadius: 10,
+                            padding: "9px 10px", font: "inherit" }} />
+            <button className="mini-btn" onClick={() => {
+              if (!num(pAmount)) return;
+              setPending(xs => [...xs, { amount: pAmount, note: pNote.trim() }]);
+              setPAmount(""); setPNote("");
+            }}>{t("add")}</button>
+          </div>
+        )}
+        <div className="fhint" style={{ marginTop: 8 }}>{t("pz_pending_hint")}</div>
+      </div>
+
       {unit.kind === "bolt" && (
         <>
           <div className="stat-card">
@@ -692,6 +761,12 @@ function ClosingForm({ unit, meta, today, onChanged }: {
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}>
             <span className="muted">{t("pz_expenses")}</span><b>+ {fmt(expTotal)}</b>
           </div>
+          {pendTotal > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}>
+              <span className="muted">{t("pz_pending_title")}</span>
+              <b style={{ color: "#b3431f" }}>+ {fmt(pendTotal)}</b>
+            </div>
+          )}
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4, borderTop: "1px solid #edf1ee", paddingTop: 6 }}>
             <span className="muted">{t("pz_nexus_rev")}</span><b>{fmt(effNexus ?? 0)}</b>
           </div>
@@ -723,28 +798,41 @@ function ClosingForm({ unit, meta, today, onChanged }: {
       )}
 
       {adding && (
-        <ExpenseModal meta={meta} onClose={() => setAdding(false)}
+        <ExpenseModal meta={meta} unitKind={unit.kind} onClose={() => setAdding(false)}
                       onAdd={e => { setExpenses(xs => [...xs, e]); setAdding(false); }} />
       )}
     </div>
   );
 }
 
-function ExpenseModal({ meta, onClose, onAdd }: {
+function ExpenseModal({ meta, unitKind, onClose, onAdd }: {
   meta: { categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] };
+  unitKind: "bolt" | "lerakat";
   onClose: () => void;
   onAdd: (e: ExpenseDraft) => void;
 }) {
   const { t, pick } = useI18n();
-  const cats = meta.categories.filter(c => c.staff_can_use && c.approved);
+  const cats = meta.categories.filter(c =>
+    c.staff_can_use && c.approved && (c.scope === "mind" || c.scope === unitKind));
   const [cat, setCat] = useState(cats[0]?.id ?? "");
   const [amount, setAmount] = useState("");
   const [vehicle, setVehicle] = useState("");
   const [client, setClient] = useState("");
   const [desc, setDesc] = useState("");
   const [err, setErr] = useState("");
+  const [clientOpts, setClientOpts] = useState<string[]>([]);
   const c = cats.find(x => x.id === cat);
   const labels = meta.quicklabels.filter(q => q.category_id === cat);
+
+  // ügyfél-javaslatok a NEXUS-törzsből, gépelés közben
+  useEffect(() => {
+    if (client.trim().length < 2) { setClientOpts([]); return; }
+    const h = setTimeout(async () => {
+      try { setClientOpts(await withAuthRetry(() => cashClients(client.trim()))); }
+      catch { /* javaslatok nélkül is megy */ }
+    }, 300);
+    return () => clearTimeout(h);
+  }, [client]);
 
   function add() {
     if (!num(amount)) { setErr(t("pz_err_amount")); return; }
@@ -777,7 +865,12 @@ function ExpenseModal({ meta, onClose, onAdd }: {
         {c?.req_client && (
           <>
             <label>{t("pz_client")} *</label>
-            <input type="text" value={client} onChange={e => setClient(e.target.value)} />
+            <input type="text" list="pz-client-list" value={client}
+                   placeholder={"🔍 " + t("pz_client_hint")}
+                   onChange={e => setClient(e.target.value)} />
+            <datalist id="pz-client-list">
+              {clientOpts.map(x => <option key={x} value={x} />)}
+            </datalist>
           </>
         )}
         <label>{t("pz_desc")}{c?.req_desc ? " *" : ""}</label>
@@ -1082,6 +1175,8 @@ function KategoriakTab({ meta, onChanged }: {
                   {c.req_vehicle && <span className="pz-chip">{t("pz_req")}: {t("pz_vehicle")}</span>}
                   {c.req_client && <span className="pz-chip">{t("pz_req")}: {t("pz_client")}</span>}
                   {c.req_desc && <span className="pz-chip">{t("pz_req")}: {t("pz_desc")}</span>}
+                  {c.scope !== "mind" && <span className="pz-chip" style={{ background: "#e8f0fe", color: "#1a4fbc" }}>
+                    {c.scope === "bolt" ? t("pz_scope_bolt") : t("pz_scope_lerakat")}</span>}
                   {!c.staff_can_use && <span className="pz-chip">{t("pz_admin_only")}</span>}
                   {!c.approved && <span className="pz-chip" style={{ background: "#fbeccb", color: "#9a6c10" }}>{t("pz_pending")}</span>}
                   <span className="muted" style={{ fontSize: 11.5 }}>
@@ -1135,6 +1230,7 @@ function CategoryModal({ cat, quicklabels, onClose, onSaved }: {
   const [reqC, setReqC] = useState(cat?.req_client ?? false);
   const [reqD, setReqD] = useState(cat?.req_desc ?? false);
   const [staff, setStaff] = useState(cat?.staff_can_use ?? true);
+  const [scope, setScope] = useState<"mind" | "bolt" | "lerakat">(cat?.scope ?? "mind");
   const [approved, setApproved] = useState(cat?.approved ?? true);
   const [active, setActive] = useState(cat?.active ?? true);
   const [labels, setLabels] = useState(quicklabels.map(q => q.label).join(", "));
@@ -1146,7 +1242,7 @@ function CategoryModal({ cat, quicklabels, onClose, onSaved }: {
     setBusy(true); setErr("");
     try {
       const row = { name_hu: hu.trim(), name_ro: ro.trim() || null, req_vehicle: reqV,
-                    req_client: reqC, req_desc: reqD, staff_can_use: staff, approved, active };
+                    req_client: reqC, req_desc: reqD, staff_can_use: staff, approved, active, scope };
       let catId = cat?.id;
       if (cat) {
         const { error } = await supabase.from("cash_categories").update(row).eq("id", cat.id);
@@ -1178,6 +1274,12 @@ function CategoryModal({ cat, quicklabels, onClose, onSaved }: {
         <input type="text" value={hu} onChange={e => setHu(e.target.value)} autoFocus />
         <label>{t("f_name_ro")}</label>
         <input type="text" value={ro} onChange={e => setRo(e.target.value)} />
+        <label>{t("pz_scope")}</label>
+        <select className="sel" value={scope} onChange={e => setScope(e.target.value as "mind" | "bolt" | "lerakat")}>
+          <option value="mind">{t("pz_scope_mind")}</option>
+          <option value="bolt">{t("pz_scope_bolt")}</option>
+          <option value="lerakat">{t("pz_scope_lerakat")}</option>
+        </select>
         <label>{t("pz_req_fields")}</label>
         <div className="chk"><input id="rv" type="checkbox" checked={reqV} onChange={e => setReqV(e.target.checked)} /><label htmlFor="rv" style={{ textTransform: "none", margin: 0 }}>{t("pz_vehicle")}</label></div>
         <div className="chk"><input id="rc" type="checkbox" checked={reqC} onChange={e => setReqC(e.target.checked)} /><label htmlFor="rc" style={{ textTransform: "none", margin: 0 }}>{t("pz_client")}</label></div>
