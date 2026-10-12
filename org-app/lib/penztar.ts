@@ -59,18 +59,37 @@ export type DayPayload = {
   pending: { amount: number; note: string | null }[];
 };
 
-export async function cashSaveDay(unitId: string, payload: DayPayload): Promise<string> {
+export async function cashSaveDay(unitId: string, payload: DayPayload, day?: string | null): Promise<string> {
   const { data, error } = await supabase.rpc("app_cash_save_day", {
-    p_unit: unitId, p_payload: payload,
+    p_unit: unitId, p_payload: payload, p_day: day || null,
   });
   fail(error);
   return data as string;
 }
 
-export async function cashCloseDay(unitId: string): Promise<{ cash_diff: number; card_diff: number | null }> {
-  const { data, error } = await supabase.rpc("app_cash_close_day", { p_unit: unitId });
+export async function cashCloseDay(unitId: string, day?: string | null): Promise<{ cash_diff: number; card_diff: number | null }> {
+  const { data, error } = await supabase.rpc("app_cash_close_day", { p_unit: unitId, p_day: day || null });
   fail(error);
   return data as { cash_diff: number; card_diff: number | null };
+}
+
+export async function cashReopenDay(unitId: string, day: string): Promise<void> {
+  const { error } = await supabase.rpc("app_cash_reopen_day", { p_unit: unitId, p_day: day });
+  fail(error);
+}
+
+export type DayDetail = {
+  day: CashDay | null;
+  monetar: { denom: number; qty: number }[];
+  expenses: CashExpense[];
+  pending: PendingItem[];
+  nexus: number | null;
+};
+
+export async function cashDayDetail(unitId: string, day: string): Promise<DayDetail> {
+  const { data, error } = await supabase.rpc("app_cash_day_detail", { p_unit: unitId, p_day: day });
+  fail(error);
+  return data as DayDetail;
 }
 
 export async function cashMeta(): Promise<{

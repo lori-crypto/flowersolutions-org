@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
@@ -10,6 +10,7 @@ import {
   cashBalance, cashLedger, cashQuickAdd, uploadReceipt, receiptUrl,
   cashOverview, cashMonetarOf, cashReview, CashExpense,
   cashClients, cashPendingResolve, PendingItem,
+  cashReopenDay, cashDayDetail,
 } from "@/lib/penztar";
 
 const fmt = (n: number) =>
@@ -31,7 +32,8 @@ export default function PenztarPage() {
   const [meta, setMeta] = useState<{ categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] } | null>(null);
   const [unitId, setUnitId] = useState<string | null>(null);
   const [isHr, setIsHr] = useState(false);
-  const [tab, setTab] = useState<"zaras" | "naplo" | "ellenorzes" | "kategoriak">("zaras");
+  const [tab, setTab] = useState<"zaras" | "naplo" | "havi" | "ellenorzes" | "kategoriak">("zaras");
+  const [editing, setEditing] = useState<{ unit: CashUnit; day: string } | null>(null);
   const [err, setErr] = useState("");
   const [denied, setDenied] = useState(false);
 
@@ -62,6 +64,25 @@ export default function PenztarPage() {
   }, [router, reload]);
 
   const unit = ctx?.units.find(u => u.id === unitId) ?? null;
+
+  const loadPast = useCallback(async (u: CashUnit, day: string) => {
+    const det = await withAuthRetry(() => cashDayDetail(u.id, day));
+    const pseudo: CashUnit = {
+      ...u, today_day: det.day, monetar: det.monetar, expenses: det.expenses,
+      pending_today: det.pending, pending_open: [], nexus_today: det.nexus,
+      nexus_synced_at: null, history: [],
+    };
+    setEditing({ unit: pseudo, day });
+  }, []);
+
+  async function openPast(u: CashUnit, day: string, status: string) {
+    try {
+      if (status === "lezart" || status === "elfogadva") {
+        await withAuthRetry(() => cashReopenDay(u.id, day));
+      }
+      await loadPast(u, day);
+    } catch (e) { alert((e as Error).message); }
+  }
 
   return (
     <>
@@ -100,6 +121,8 @@ export default function PenztarPage() {
                       onClick={() => setTab("zaras")}>{t("pz_tab_zaras")}</button>
               <button className={"bchip" + (tab === "naplo" ? " on" : "")}
                       onClick={() => setTab("naplo")}>{t("pz_tab_naplo")}</button>
+              <button className={"bchip" + (tab === "havi" ? " on" : "")}
+                      onClick={() => setTab("havi")}>{t("pz_tab_havi")}</button>
               <button className={"bchip" + (tab === "ellenorzes" ? " on" : "")}
                       onClick={() => setTab("ellenorzes")}>{t("pz_tab_ellenorzes")}</button>
               <button className={"bchip" + (tab === "kategoriak" ? " on" : "")}
@@ -108,6 +131,8 @@ export default function PenztarPage() {
           )}
           {tab === "naplo" && isHr ? (
             <NaploTab meta={meta} units={ctx.units} />
+          ) : tab === "havi" && isHr ? (
+            <HaviTab units={ctx.units} />
           ) : tab === "ellenorzes" && isHr ? (
             <EllenorzesTab meta={meta} units={ctx.units} />
           ) : tab === "kategoriak" && isHr ? (
@@ -121,11 +146,26 @@ export default function PenztarPage() {
               ))}
             </div>
           )}
-          {unit && (
+          {editing ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="stat-card" style={{ display: "flex", alignItems: "center", gap: 10,
+                                                  borderColor: "#f0ddbb", background: "#fdf8ee" }}>
+                <b style={{ fontSize: 13.5, color: "#9a6c10" }}>✎ {t("pz_editing_past")}: {editing.day}</b>
+                <span style={{ flex: 1 }} />
+                <button className="mini-btn" onClick={() => { setEditing(null); reload(); }}>
+                  ← {t("pz_back_today")}
+                </button>
+              </div>
+              <ClosingForm key={"past" + editing.unit.id + editing.day + (editing.unit.today_day?.status ?? "")}
+                           unit={editing.unit} meta={meta} today={editing.day}
+                           editDay={editing.day}
+                           onChanged={async () => { await loadPast(editing.unit, editing.day); }} />
+            </div>
+          ) : unit && (
             <ClosingForm key={unit.id + (unit.today_day?.status ?? "")} unit={unit} meta={meta}
                          today={ctx.today} onChanged={reload} />
           )}
-          {unit && unit.kind === "lerakat" && unit.history.length > 0 && (
+          {!editing && unit && unit.kind === "lerakat" && unit.history.length > 0 && (
             <div className="stat-card" style={{ marginTop: 14 }}>
               <b style={{ fontSize: 14 }}>{t("pz_history_title")}</b>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
@@ -143,6 +183,9 @@ export default function PenztarPage() {
                       : h.cash_diff != null && Math.abs(h.cash_diff) > 1
                         ? <span className="pct-tag neg">{h.cash_diff > 0 ? "+" : ""}{fmt(h.cash_diff)}</span>
                         : <span className="pct-tag pos">{fmt(h.cash_diff ?? 0)} ✓</span>}
+                    <button className="mini-btn" onClick={() => openPast(unit, h.day, h.status)}>
+                      ✎ {t("pz_open_day")}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -403,13 +446,14 @@ function QuickAdd({ meta, units, onSaved }: {
   );
 }
 
-function ClosingForm({ unit, meta, today, onChanged }: {
+function ClosingForm({ unit, meta, today, editDay, onChanged }: {
   unit: CashUnit;
   meta: { categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] };
   today: string;
+  editDay?: string;
   onChanged: () => Promise<void>;
 }) {
-  const { t, pick } = useI18n();
+  const { t, lang, pick } = useI18n();
   const d = unit.today_day;
   const locked = d?.status === "lezart" || d?.status === "elfogadva";
 
@@ -502,9 +546,9 @@ function ClosingForm({ unit, meta, today, onChanged }: {
   async function save(closeToo: boolean) {
     setBusy(true); setErr(""); setMsg("");
     try {
-      await withAuthRetry(() => cashSaveDay(unit.id, payload()));
+      await withAuthRetry(() => cashSaveDay(unit.id, payload(), editDay));
       if (closeToo) {
-        await withAuthRetry(() => cashCloseDay(unit.id));
+        await withAuthRetry(() => cashCloseDay(unit.id, editDay));
       }
       setMsg(closeToo ? t("pz_closed_ok") : t("pz_saved"));
       await onChanged();
@@ -796,6 +840,27 @@ function ClosingForm({ unit, meta, today, onChanged }: {
           }}>{t("pz_close_day")}</button>
         </div>
       )}
+      <button className="mini-btn" style={{ padding: 12, fontSize: 14.5 }} onClick={() => {
+        const pseudo = {
+          id: d?.id ?? "", unit_id: unit.id, day: editDay ?? today,
+          status: d?.status ?? "nyitott", closed_by: null,
+          float_morning: num(floatM), float_evening: num(floatE),
+          counted_cash: counted, z_cash: zCash ? num(zCash) : null,
+          z_card: zCard ? num(zCard) : null, pos_settlement: pos ? num(pos) : null,
+          nexus_revenue: effNexus, cash_diff: cashDiff, card_diff: cardDiff,
+          expl_cash: explCash || null, expl_card: explCard || null, review_note: null,
+          cash_units: { name_hu: unit.name_hu, name_ro: unit.name_ro, kind: unit.kind },
+        } as unknown as OverviewDay;
+        const mon = DENOMS.map(dn => ({ denom: dn, qty: parseInt(qty[String(dn)] || "0", 10) || 0 }))
+          .filter(m => m.qty > 0);
+        const exps = expenses.map(e => ({
+          amount: num(e.amount), category_id: e.category_id || null,
+          vehicle_id: e.vehicle_id || null, client_name: e.client_name || null,
+          description: e.description || null, id: "", day: editDay ?? today,
+        })) as unknown as (CashExpense & { day: string })[];
+        printDay(pseudo, mon, exps, meta, new Map(), lang,
+                 pending.map(p => ({ amount: num(p.amount), note: p.note || null })));
+      }}>🖨 {t("pz_print")}</button>
 
       {adding && (
         <ExpenseModal meta={meta} unitKind={unit.kind} onClose={() => setAdding(false)}
@@ -1094,6 +1159,7 @@ function printDay(
   meta: { categories: CashCategory[]; vehicles: CashVehicle[] },
   persons: Map<string, string>,
   lang: string,
+  pending: { amount: number; note: string | null }[] = [],
 ) {
   const ro = lang === "ro";
   const uname = ro ? (d.cash_units?.name_ro ?? d.cash_units?.name_hu) : d.cash_units?.name_hu;
@@ -1129,6 +1195,8 @@ function printDay(
   <tr><td>${ro ? "Diferență numerar" : "Készpénz-eltérés"}</td><td style="text-align:right">${d.cash_diff != null ? fmt(d.cash_diff) : "—"}</td></tr>
   ${d.card_diff != null ? `<tr><td>${ro ? "Diferență card" : "Kártya-eltérés"}</td><td style="text-align:right">${fmt(d.card_diff)}</td></tr>` : ""}</table>
   <h2>${ro ? "Cheltuieli" : "Költségek"}</h2><table>${expRows || `<tr><td>—</td></tr>`}<tr class="tot"><td colspan="2">Total</td><td style="text-align:right">${fmt(expSum)}</td></tr></table>
+  ${pending.length ? `<h2>${ro ? "Bani rămași la șofer" : "Sofőrnél maradt pénz"}</h2><table>${pending.map(p =>
+    `<tr><td>${esc(p.note ?? "—")}</td><td style="text-align:right">${fmt(p.amount)}</td></tr>`).join("")}</table>` : ""}
   ${d.expl_cash ? `<h2>${ro ? "Explicație numerar" : "Készpénz-indoklás"}</h2><div>${esc(d.expl_cash)}</div>` : ""}
   ${d.expl_card ? `<h2>${ro ? "Explicație card" : "Kártya-indoklás"}</h2><div>${esc(d.expl_card)}</div>` : ""}
   <div class="sig"><div>${ro ? "Predat (semnătura)" : "Átadta (aláírás)"}</div><div>${ro ? "Preluat (semnătura)" : "Átvette (aláírás)"}</div></div>
@@ -1295,6 +1363,203 @@ function CategoryModal({ cat, quicklabels, onClose, onSaved }: {
         <div className="btns">
           <button className="btn-cancel" onClick={onClose}>{t("cancel")}</button>
           <button className="btn-save" onClick={save} disabled={busy || !hu.trim()}>{t("save")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════ HAVI NÉZET (a régi táblázat mintájára) ══════════ */
+function HaviTab({ units }: { units: CashUnit[] }) {
+  const { t, pick } = useI18n();
+  const now = new Date();
+  const [ym, setYm] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [days, setDays] = useState<OverviewDay[] | null>(null);
+  const [expenses, setExpenses] = useState<(CashExpense & { day_id: string | null; day: string; kind: string })[]>([]);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    setErr("");
+    try {
+      const [y, m] = ym.split("-").map(Number);
+      const from = `${ym}-01`;
+      const to = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+      const o = await withAuthRetry(() => cashOverview(from, to));
+      setDays(o.days); setExpenses(o.expenses);
+    } catch (e) { setErr((e as Error).message); }
+  }, [ym]);
+  useEffect(() => { load(); }, [load]);
+
+  const shift = (d: number) => {
+    const [y, m] = ym.split("-").map(Number);
+    const n = new Date(y, m - 1 + d, 1);
+    setYm(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const bolts = units.filter(u => u.kind === "bolt").sort((a, b) => a.sort - b.sort);
+  const lerakats = units.filter(u => u.kind === "lerakat").sort((a, b) => a.sort - b.sort);
+  const [y, m] = ym.split("-").map(Number);
+  const dayCount = new Date(y, m, 0).getDate();
+  const dayList = Array.from({ length: dayCount }, (_, i) =>
+    `${ym}-${String(i + 1).padStart(2, "0")}`);
+
+  const dmap = useMemo(() => {
+    const mm = new Map<string, OverviewDay>();
+    for (const d of days ?? []) mm.set(d.unit_id + "|" + d.day, d);
+    return mm;
+  }, [days]);
+  const expByDay = useMemo(() => {
+    const mm = new Map<string, number>();
+    for (const e of expenses) {
+      if (e.kind !== "koltseg") continue;
+      mm.set(e.day, (mm.get(e.day) ?? 0) + Number(e.amount || 0));
+    }
+    return mm;
+  }, [expenses]);
+
+  const cashOf = (u: CashUnit, day: string) => dmap.get(u.id + "|" + day)?.counted_cash ?? null;
+  const cardOf = (u: CashUnit, day: string) => dmap.get(u.id + "|" + day)?.pos_settlement ?? null;
+
+  const colTotals = useMemo(() => {
+    const tot: Record<string, number> = {};
+    for (const u of bolts) {
+      tot[u.id + "c"] = dayList.reduce((s, d) => s + (cashOf(u, d) ?? 0), 0);
+      tot[u.id + "k"] = dayList.reduce((s, d) => s + (cardOf(u, d) ?? 0), 0);
+    }
+    for (const u of lerakats) {
+      tot[u.id + "c"] = dayList.reduce((s, d) => s + (cashOf(u, d) ?? 0), 0);
+    }
+    tot["exp"] = dayList.reduce((s, d) => s + (expByDay.get(d) ?? 0), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return tot;
+  }, [dmap, expByDay, ym]);
+
+  const grand = bolts.reduce((s, u) => s + (colTotals[u.id + "c"] ?? 0) + (colTotals[u.id + "k"] ?? 0), 0)
+    + lerakats.reduce((s, u) => s + (colTotals[u.id + "c"] ?? 0), 0);
+
+  const monthExpenses = expenses
+    .filter(e => e.kind === "koltseg" || e.day_id === null)
+    .sort((a, b) => a.day.localeCompare(b.day));
+
+  const td: React.CSSProperties = { padding: "5px 9px", textAlign: "right",
+    fontVariantNumeric: "tabular-nums", borderTop: "1px solid #f0f3f1", whiteSpace: "nowrap" };
+  const th: React.CSSProperties = { padding: "7px 9px", fontSize: 10.5, textTransform: "uppercase",
+    letterSpacing: "0.04em", color: "#8a968d", textAlign: "right", whiteSpace: "nowrap" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {err && <div className="leave-err">{err}</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button className="mini-btn" onClick={() => shift(-1)}>‹</button>
+        <b style={{ fontSize: 15 }}>{ym}</b>
+        <button className="mini-btn" onClick={() => shift(1)}>›</button>
+        <span style={{ flex: 1 }} />
+        <span className="muted" style={{ fontSize: 12.5 }}>
+          {t("pz_havi_total")}: <b style={{ color: "#1d5a33" }}>{fmt(grand)}</b> · {t("pz_expenses")}: <b style={{ color: "#b3431f" }}>{fmt(colTotals["exp"] ?? 0)}</b>
+        </span>
+      </div>
+
+      <div className="stat-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13, minWidth: 760 }}>
+            <thead>
+              <tr style={{ background: "#f4f7f5" }}>
+                <th style={{ ...th, textAlign: "left" }}>{t("pz_day")}</th>
+                {bolts.map(u => (
+                  <th key={u.id} colSpan={2} style={{ ...th, textAlign: "center", borderLeft: "1px solid #e2e8e3" }}>
+                    {pick(u.name_hu, u.name_ro ?? u.name_hu)}
+                  </th>
+                ))}
+                {lerakats.map(u => (
+                  <th key={u.id} style={{ ...th, borderLeft: "1px solid #e2e8e3" }}>
+                    {pick(u.name_hu, u.name_ro ?? u.name_hu)}
+                  </th>
+                ))}
+                <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}>{t("pz_expenses")}</th>
+                <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}>Σ</th>
+              </tr>
+              <tr style={{ background: "#f4f7f5" }}>
+                <th style={th}></th>
+                {bolts.map(u => (
+                  <React.Fragment key={u.id}>
+                    <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}>KP</th>
+                    <th style={th}>{t("pz_card")}</th>
+                  </React.Fragment>
+                ))}
+                {lerakats.map(u => <th key={u.id} style={{ ...th, borderLeft: "1px solid #e2e8e3" }}>KP</th>)}
+                <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}></th>
+                <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}></th>
+              </tr>
+              <tr style={{ background: "#eef6f0", fontWeight: 700 }}>
+                <td style={{ ...td, textAlign: "left", borderTop: "none" }}>Σ</td>
+                {bolts.map(u => (
+                  <React.Fragment key={u.id}>
+                    <td style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none" }}>{fmt(colTotals[u.id + "c"] ?? 0)}</td>
+                    <td style={{ ...td, borderTop: "none" }}>{fmt(colTotals[u.id + "k"] ?? 0)}</td>
+                  </React.Fragment>
+                ))}
+                {lerakats.map(u => (
+                  <td key={u.id} style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none" }}>{fmt(colTotals[u.id + "c"] ?? 0)}</td>
+                ))}
+                <td style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none", color: "#b3431f" }}>{fmt(colTotals["exp"] ?? 0)}</td>
+                <td style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none", color: "#1d5a33" }}>{fmt(grand - (colTotals["exp"] ?? 0))}</td>
+              </tr>
+            </thead>
+            <tbody>
+              {!days ? (
+                <tr><td colSpan={99} style={{ ...td, textAlign: "center" }}>{t("loading")}</td></tr>
+              ) : dayList.map(day => {
+                const exp = expByDay.get(day) ?? 0;
+                let rowSum = 0;
+                for (const u of bolts) rowSum += (cashOf(u, day) ?? 0) + (cardOf(u, day) ?? 0);
+                for (const u of lerakats) rowSum += cashOf(u, day) ?? 0;
+                const empty = rowSum === 0 && exp === 0;
+                return (
+                  <tr key={day} style={empty ? { color: "#b6beb9" } : undefined}>
+                    <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{Number(day.slice(8))}</td>
+                    {bolts.map(u => {
+                      const c = cashOf(u, day); const k = cardOf(u, day);
+                      return (
+                        <React.Fragment key={u.id}>
+                          <td style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>{c != null ? fmt(c) : ""}</td>
+                          <td style={td}>{k != null ? fmt(k) : ""}</td>
+                        </React.Fragment>
+                      );
+                    })}
+                    {lerakats.map(u => {
+                      const c = cashOf(u, day);
+                      return <td key={u.id} style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>{c != null ? fmt(c) : ""}</td>;
+                    })}
+                    <td style={{ ...td, borderLeft: "1px solid #f0f3f1", color: exp ? "#b3431f" : undefined }}>
+                      {exp ? fmt(exp) : ""}
+                    </td>
+                    <td style={{ ...td, borderLeft: "1px solid #f0f3f1", fontWeight: 700 }}>
+                      {empty ? "" : fmt(rowSum - exp)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="stat-card">
+        <b style={{ fontSize: 14 }}>{t("pz_havi_exp_list")}</b>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 8 }}>
+          {monthExpenses.length === 0 && <div className="muted" style={{ fontSize: 13 }}>{t("stat_no_data")}</div>}
+          {monthExpenses.map((e, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, fontSize: 13, alignItems: "baseline" }}>
+              <b style={{ width: 44 }}>{e.day.slice(8)}.</b>
+              <span style={{ flex: 1 }}>
+                {e.description || (e.kind === "letet" ? t("pz_k_letet") : e.kind)}
+                {e.client_name ? ` · ${e.client_name}` : ""}
+              </span>
+              <b style={{ fontVariantNumeric: "tabular-nums", color: e.kind === "koltseg" ? "#b3431f" : "#33528a" }}>
+                {fmt(Number(e.amount))}
+              </b>
+            </div>
+          ))}
         </div>
       </div>
     </div>
