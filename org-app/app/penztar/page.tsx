@@ -5,9 +5,10 @@ import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import {
-  CashUnit, CashCategory, CashVehicle, CashQuicklabel, DayPayload, LedgerEntry,
+  CashUnit, CashCategory, CashVehicle, CashQuicklabel, DayPayload, LedgerEntry, OverviewDay,
   cashContext, cashSaveDay, cashCloseDay, cashMeta, DENOMS,
   cashBalance, cashLedger, cashQuickAdd, uploadReceipt, receiptUrl,
+  cashOverview, cashMonetarOf, cashReview, CashExpense,
 } from "@/lib/penztar";
 
 const fmt = (n: number) =>
@@ -29,7 +30,7 @@ export default function PenztarPage() {
   const [meta, setMeta] = useState<{ categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] } | null>(null);
   const [unitId, setUnitId] = useState<string | null>(null);
   const [isHr, setIsHr] = useState(false);
-  const [tab, setTab] = useState<"zaras" | "naplo">("zaras");
+  const [tab, setTab] = useState<"zaras" | "naplo" | "ellenorzes" | "kategoriak">("zaras");
   const [err, setErr] = useState("");
   const [denied, setDenied] = useState(false);
 
@@ -91,17 +92,25 @@ export default function PenztarPage() {
       ) : ctx.units.length === 0 && !isHr ? (
         <div className="center-msg">{t("pz_no_unit")}</div>
       ) : (
-        <div className="pz-wrap" style={tab === "naplo" ? { maxWidth: 980 } : undefined}>
+        <div className="pz-wrap" style={tab !== "zaras" ? { maxWidth: 1060 } : undefined}>
           {isHr && (
             <div className="board-chips" style={{ marginBottom: 12 }}>
               <button className={"bchip" + (tab === "zaras" ? " on" : "")}
                       onClick={() => setTab("zaras")}>{t("pz_tab_zaras")}</button>
               <button className={"bchip" + (tab === "naplo" ? " on" : "")}
                       onClick={() => setTab("naplo")}>{t("pz_tab_naplo")}</button>
+              <button className={"bchip" + (tab === "ellenorzes" ? " on" : "")}
+                      onClick={() => setTab("ellenorzes")}>{t("pz_tab_ellenorzes")}</button>
+              <button className={"bchip" + (tab === "kategoriak" ? " on" : "")}
+                      onClick={() => setTab("kategoriak")}>{t("pz_tab_kategoriak")}</button>
             </div>
           )}
           {tab === "naplo" && isHr ? (
             <NaploTab meta={meta} units={ctx.units} />
+          ) : tab === "ellenorzes" && isHr ? (
+            <EllenorzesTab meta={meta} units={ctx.units} />
+          ) : tab === "kategoriak" && isHr ? (
+            <KategoriakTab meta={meta} onChanged={reload} />
           ) : (<>
           {ctx.units.length > 1 && (
             <div className="board-chips" style={{ marginBottom: 12 }}>
@@ -785,6 +794,405 @@ function ExpenseModal({ meta, onClose, onAdd }: {
         <div className="btns">
           <button className="btn-cancel" onClick={onClose}>{t("cancel")}</button>
           <button className="btn-save" onClick={add}>{t("add")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════ ELLENŐRZÉS (vezetői) ══════════ */
+function EllenorzesTab({ meta, units }: {
+  meta: { categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] };
+  units: CashUnit[];
+}) {
+  const { t, lang, pick } = useI18n();
+  const now = new Date();
+  const [ym, setYm] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [unitF, setUnitF] = useState("");
+  const [days, setDays] = useState<OverviewDay[] | null>(null);
+  const [expenses, setExpenses] = useState<(CashExpense & { day_id: string | null; day: string; kind: string })[]>([]);
+  const [persons, setPersons] = useState<Map<string, string>>(new Map());
+  const [open, setOpen] = useState<string | null>(null);
+  const [monetar, setMonetar] = useState<{ denom: number; qty: number }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    setErr("");
+    try {
+      const [y, m] = ym.split("-").map(Number);
+      const from = `${ym}-01`;
+      const to = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+      const o = await withAuthRetry(() => cashOverview(from, to));
+      setDays(o.days); setExpenses(o.expenses); setPersons(o.persons);
+    } catch (e) { setErr((e as Error).message); }
+  }, [ym]);
+  useEffect(() => { load(); }, [load]);
+
+  const shift = (d: number) => {
+    const [y, m] = ym.split("-").map(Number);
+    const n = new Date(y, m - 1 + d, 1);
+    setYm(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  async function expand(d: OverviewDay) {
+    if (open === d.id) { setOpen(null); return; }
+    setOpen(d.id);
+    try { setMonetar(await withAuthRetry(() => cashMonetarOf(d.id))); }
+    catch { setMonetar([]); }
+  }
+
+  async function review(d: OverviewDay, action: "elfogad" | "visszakuld") {
+    let note: string | null = null;
+    if (action === "visszakuld") {
+      note = prompt(t("pz_return_note"));
+      if (!note) return;
+    }
+    setBusy(true);
+    try { await withAuthRetry(() => cashReview(d.id, action, note ?? undefined)); await load(); }
+    catch (e) { alert((e as Error).message); }
+    setBusy(false);
+  }
+
+  const statusChip = (st: string) =>
+    st === "elfogadva" ? <span className="pct-tag pos">{t("pz_st_elfogadva")}</span>
+    : st === "lezart" ? <span className="acct-tag ok">{t("pz_st_lezart")}</span>
+    : st === "visszakuldve" ? <span className="pct-tag neg">{t("pz_st_visszakuldve")}</span>
+    : <span className="acct-tag">{t("pz_st_nyitott")}</span>;
+
+  function doPrint(d: OverviewDay) {
+    const exps = expenses.filter(e => e.day_id === d.id);
+    printDay(d, monetar, exps, meta, persons, lang);
+  }
+
+  const shown = (days ?? []).filter(d => !unitF || d.unit_id === unitF);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {err && <div className="leave-err">{err}</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div className="board-chips">
+          <button className={"bchip" + (!unitF ? " on" : "")} onClick={() => setUnitF("")}>{t("stat_all")}</button>
+          {units.map(u => (
+            <button key={u.id} className={"bchip" + (unitF === u.id ? " on" : "")}
+                    onClick={() => setUnitF(u.id)}>{pick(u.name_hu, u.name_ro ?? u.name_hu)}</button>
+          ))}
+        </div>
+        <span style={{ flex: 1 }} />
+        <button className="mini-btn" onClick={() => shift(-1)}>‹</button>
+        <b style={{ fontSize: 14 }}>{ym}</b>
+        <button className="mini-btn" onClick={() => shift(1)}>›</button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {!days ? <div className="muted">{t("loading")}</div> :
+          shown.length === 0 ? <div className="muted" style={{ fontSize: 13 }}>{t("stat_no_data")}</div> :
+          shown.map(d => {
+            const exps = expenses.filter(e => e.day_id === d.id);
+            const expSum = exps.reduce((s, e) => s + Number(e.amount || 0), 0);
+            const o = open === d.id;
+            const warn = (d.cash_diff != null && Math.abs(d.cash_diff) > 1 && !d.expl_cash) ||
+                         (d.card_diff != null && Math.abs(d.card_diff) > 1 && !d.expl_card);
+            return (
+              <div key={d.id} className="stat-card"
+                   style={{ padding: 0, overflow: "hidden",
+                            borderColor: warn ? "#f0ddbb" : d.status === "visszakuldve" ? "#eec6bd" : undefined }}>
+                <button onClick={() => expand(d)}
+                        style={{ width: "100%", border: "none", background: "none", padding: "12px 14px",
+                                 display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
+                                 font: "inherit", textAlign: "left", flexWrap: "wrap" }}>
+                  <b style={{ fontSize: 14 }}>{o ? "▾" : "▸"} {d.day}</b>
+                  <span className="pz-chip">{pick(d.cash_units?.name_hu ?? "", d.cash_units?.name_ro ?? d.cash_units?.name_hu ?? "")}</span>
+                  <span className="muted" style={{ fontSize: 12.5 }}>{d.closed_by ? persons.get(d.closed_by) ?? "" : ""}</span>
+                  <span style={{ flex: 1 }} />
+                  {d.cash_diff != null && (
+                    <span className={"pct-tag " + (Math.abs(d.cash_diff) <= 1 ? "pos" : "neg")}>
+                      KP {d.cash_diff > 0 ? "+" : ""}{fmt(d.cash_diff)}
+                    </span>
+                  )}
+                  {d.card_diff != null && (
+                    <span className={"pct-tag " + (Math.abs(d.card_diff) <= 1 ? "pos" : "neg")}>
+                      {t("pz_card")} {d.card_diff > 0 ? "+" : ""}{fmt(d.card_diff)}
+                    </span>
+                  )}
+                  {statusChip(d.status)}
+                </button>
+                {o && (
+                  <div style={{ borderTop: "1px solid #edf1ee", padding: "12px 14px",
+                                display: "flex", flexWrap: "wrap", gap: 18 }}>
+                    <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+                      <div className="kpi-l">{t("pz_monetar")}</div>
+                      {monetar.length === 0 ? <div className="muted" style={{ fontSize: 13 }}>—</div> :
+                        monetar.map(m => (
+                          <div key={m.denom} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span>{m.qty} × {m.denom.toLocaleString("hu-HU")}</span>
+                            <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(m.denom * m.qty)}</span>
+                          </div>
+                        ))}
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5,
+                                    fontWeight: 700, borderTop: "1px solid #edf1ee", marginTop: 4, paddingTop: 4 }}>
+                        <span>{t("pz_counted")}</span>
+                        <span>{fmt(d.counted_cash ?? 0)}</span>
+                      </div>
+                    </div>
+                    <div style={{ flex: "1 1 240px", minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div className="kpi-l">{t("pz_values")}</div>
+                      {d.cash_units?.kind === "bolt" ? (
+                        <>
+                          <Row l={t("pz_float_morning") + " / " + t("pz_float_evening")}
+                               v={fmt(d.float_morning ?? 0) + " / " + fmt(d.float_evening ?? 0)} />
+                          <Row l="Z — KP" v={fmt(d.z_cash ?? 0)} />
+                          <Row l="Z — card" v={fmt(d.z_card ?? 0)} />
+                          <Row l="POS" v={fmt(d.pos_settlement ?? 0)} />
+                        </>
+                      ) : (
+                        <Row l={t("pz_nexus_rev")} v={fmt(d.nexus_revenue ?? 0)} />
+                      )}
+                      <Row l={t("pz_expenses")} v={fmt(expSum)} />
+                      {exps.map((e, i) => {
+                        const cat = meta.categories.find(c => c.id === e.category_id);
+                        const veh = meta.vehicles.find(v => v.id === e.vehicle_id);
+                        return (
+                          <div key={i} className="muted" style={{ fontSize: 12.5, paddingLeft: 8 }}>
+                            • {e.description || "—"} ({[cat && pick(cat.name_hu, cat.name_ro ?? cat.name_hu), veh?.plate, e.client_name]
+                                .filter(Boolean).join(" · ")}) — {fmt(Number(e.amount))}
+                          </div>
+                        );
+                      })}
+                      {d.expl_cash && <div style={{ fontSize: 12.5, background: "#f6f8fb", borderRadius: 8, padding: "6px 9px" }}>KP: „{d.expl_cash}"</div>}
+                      {d.expl_card && <div style={{ fontSize: 12.5, background: "#f6f8fb", borderRadius: 8, padding: "6px 9px" }}>{t("pz_card")}: „{d.expl_card}"</div>}
+                      {d.review_note && <div style={{ fontSize: 12.5, color: "#b3431f" }}>{t("pz_review_note")}: {d.review_note}</div>}
+                    </div>
+                    <div style={{ flex: "0 1 180px", display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
+                      {d.status === "lezart" && (
+                        <button className="pz-close-btn" style={{ padding: "10px 14px", fontSize: 14 }}
+                                disabled={busy} onClick={() => review(d, "elfogad")}>{t("pz_accept")}</button>
+                      )}
+                      {(d.status === "lezart" || d.status === "elfogadva") && (
+                        <button className="mini-btn" style={{ padding: "10px 14px" }}
+                                disabled={busy} onClick={() => review(d, "visszakuld")}>{t("pz_return")}</button>
+                      )}
+                      <button className="mini-btn" style={{ padding: "10px 14px" }}
+                              onClick={() => doPrint(d)}>🖨 {t("pz_print")}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+      </div>
+    </div>
+  );
+}
+
+function Row({ l, v }: { l: string; v: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+      <span className="muted">{l}</span>
+      <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{v}</span>
+    </div>
+  );
+}
+
+function printDay(
+  d: OverviewDay,
+  monetar: { denom: number; qty: number }[],
+  exps: (CashExpense & { day: string })[],
+  meta: { categories: CashCategory[]; vehicles: CashVehicle[] },
+  persons: Map<string, string>,
+  lang: string,
+) {
+  const ro = lang === "ro";
+  const uname = ro ? (d.cash_units?.name_ro ?? d.cash_units?.name_hu) : d.cash_units?.name_hu;
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const expSum = exps.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const rows = monetar.map(m =>
+    `<tr><td style="text-align:right">${m.qty}</td><td>×</td><td style="text-align:right">${m.denom.toLocaleString("hu-HU")}</td><td style="text-align:right">${fmt(m.denom * m.qty)}</td></tr>`).join("");
+  const expRows = exps.map(e => {
+    const cat = meta.categories.find(c => c.id === e.category_id);
+    const veh = meta.vehicles.find(v => v.id === e.vehicle_id);
+    const tags = [cat ? (ro ? cat.name_ro ?? cat.name_hu : cat.name_hu) : null, veh?.plate, e.client_name].filter(Boolean).join(" · ");
+    return `<tr><td>${esc(e.description ?? "—")}</td><td>${esc(tags)}</td><td style="text-align:right">${fmt(Number(e.amount))}</td></tr>`;
+  }).join("");
+  const vals = d.cash_units?.kind === "bolt"
+    ? `<tr><td>${ro ? "Schimb dimineața / seara" : "Váltó reggel / este"}</td><td style="text-align:right">${fmt(d.float_morning ?? 0)} / ${fmt(d.float_evening ?? 0)}</td></tr>
+       <tr><td>Raport Z — numerar</td><td style="text-align:right">${fmt(d.z_cash ?? 0)}</td></tr>
+       <tr><td>Raport Z — card</td><td style="text-align:right">${fmt(d.z_card ?? 0)}</td></tr>
+       <tr><td>Settlement POS</td><td style="text-align:right">${fmt(d.pos_settlement ?? 0)}</td></tr>`
+    : `<tr><td>${ro ? "Vânzarea conform casei (NEXUS)" : "A gép szerinti árulás (NEXUS)"}</td><td style="text-align:right">${fmt(d.nexus_revenue ?? 0)}</td></tr>`;
+  const w = window.open("", "_blank", "width=720,height=900");
+  if (!w) { alert("Engedélyezd a felugró ablakot. / Permite fereastra pop-up."); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(uname ?? "")} — ${d.day}</title>
+  <style>body{font-family:'Segoe UI',sans-serif;font-size:13px;color:#111;margin:28px;max-width:640px}
+  h1{font-size:17px;margin:0 0 2px}h2{font-size:13px;margin:16px 0 6px;text-transform:uppercase;letter-spacing:.05em;color:#555}
+  table{border-collapse:collapse;width:100%}td{padding:3px 8px;border-bottom:1px solid #eee}
+  .tot{font-weight:700;border-top:1.5px solid #333}
+  .sig{margin-top:40px;display:flex;gap:40px}.sig div{flex:1;border-top:1px solid #333;padding-top:4px;font-size:12px;text-align:center}
+  </style></head><body>
+  <h1>${ro ? "FOAIE DE EVIDENȚĂ" : "KASSZAZÁRÁS"} — ${esc(uname ?? "")}</h1>
+  <div>${d.day} · ${esc(d.closed_by ? persons.get(d.closed_by) ?? "" : "")} · ${esc(d.status)}</div>
+  <h2>Monetar</h2><table>${rows}<tr class="tot"><td colspan="3">${ro ? "Numerar numărat" : "Megszámolt készpénz"}</td><td style="text-align:right">${fmt(d.counted_cash ?? 0)}</td></tr></table>
+  <h2>${ro ? "Valori" : "Értékek"}</h2><table>${vals}
+  <tr><td>${ro ? "Diferență numerar" : "Készpénz-eltérés"}</td><td style="text-align:right">${d.cash_diff != null ? fmt(d.cash_diff) : "—"}</td></tr>
+  ${d.card_diff != null ? `<tr><td>${ro ? "Diferență card" : "Kártya-eltérés"}</td><td style="text-align:right">${fmt(d.card_diff)}</td></tr>` : ""}</table>
+  <h2>${ro ? "Cheltuieli" : "Költségek"}</h2><table>${expRows || `<tr><td>—</td></tr>`}<tr class="tot"><td colspan="2">Total</td><td style="text-align:right">${fmt(expSum)}</td></tr></table>
+  ${d.expl_cash ? `<h2>${ro ? "Explicație numerar" : "Készpénz-indoklás"}</h2><div>${esc(d.expl_cash)}</div>` : ""}
+  ${d.expl_card ? `<h2>${ro ? "Explicație card" : "Kártya-indoklás"}</h2><div>${esc(d.expl_card)}</div>` : ""}
+  <div class="sig"><div>${ro ? "Predat (semnătura)" : "Átadta (aláírás)"}</div><div>${ro ? "Preluat (semnătura)" : "Átvette (aláírás)"}</div></div>
+  <script>window.print()</script></body></html>`);
+  w.document.close();
+}
+
+/* ══════════ KATEGÓRIÁK (admin) ══════════ */
+function KategoriakTab({ meta, onChanged }: {
+  meta: { categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] };
+  onChanged: () => Promise<void>;
+}) {
+  const { t, pick } = useI18n();
+  const [edit, setEdit] = useState<CashCategory | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [newVeh, setNewVeh] = useState("");
+
+  async function saveVehicle() {
+    if (!newVeh.trim()) return;
+    const { error } = await supabase.from("cash_vehicles").insert({ plate: newVeh.trim().toUpperCase() });
+    if (error) { alert(error.message); return; }
+    setNewVeh("");
+    await onChanged();
+  }
+  async function dropVehicle(id: string) {
+    const { error } = await supabase.from("cash_vehicles").update({ active: false }).eq("id", id);
+    if (error) alert(error.message);
+    await onChanged();
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="stat-card">
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <b style={{ fontSize: 14, flex: 1 }}>{t("pz_tab_kategoriak")}</b>
+          <button className="mini-btn" onClick={() => setCreating(true)}>＋ {t("pz_new_cat")}</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+          {meta.categories.map(c => (
+            <div key={c.id} className="pz-exp" style={!c.approved ? { borderColor: "#f0ddbb", background: "#fdf8ee" } : undefined}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <b style={{ fontSize: 14 }}>{pick(c.name_hu, c.name_ro ?? c.name_hu)}</b>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 3 }}>
+                  {c.req_vehicle && <span className="pz-chip">{t("pz_req")}: {t("pz_vehicle")}</span>}
+                  {c.req_client && <span className="pz-chip">{t("pz_req")}: {t("pz_client")}</span>}
+                  {c.req_desc && <span className="pz-chip">{t("pz_req")}: {t("pz_desc")}</span>}
+                  {!c.staff_can_use && <span className="pz-chip">{t("pz_admin_only")}</span>}
+                  {!c.approved && <span className="pz-chip" style={{ background: "#fbeccb", color: "#9a6c10" }}>{t("pz_pending")}</span>}
+                  <span className="muted" style={{ fontSize: 11.5 }}>
+                    {meta.quicklabels.filter(q => q.category_id === c.id).map(q => q.label).join(", ")}
+                  </span>
+                </div>
+              </div>
+              <button className="pencil" onClick={() => setEdit(c)}>✎</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="stat-card">
+        <b style={{ fontSize: 14 }}>{t("pz_vehicles")}</b>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, alignItems: "center" }}>
+          {meta.vehicles.map(v => (
+            <span key={v.id} className="pz-chip" style={{ fontSize: 13, padding: "5px 11px" }}>
+              {v.plate}
+              <button className="del" style={{ marginLeft: 2 }} onClick={() => {
+                if (confirm(t("pz_veh_del"))) dropVehicle(v.id);
+              }}>✕</button>
+            </span>
+          ))}
+          <input type="text" value={newVeh} placeholder="FSS21"
+                 onChange={e => setNewVeh(e.target.value)}
+                 style={{ border: "1.5px solid #cfd9d1", borderRadius: 9, padding: "7px 10px", width: 110, font: "inherit" }} />
+          <button className="mini-btn" onClick={saveVehicle}>{t("add")}</button>
+        </div>
+      </div>
+
+      {(edit || creating) && (
+        <CategoryModal cat={edit} quicklabels={meta.quicklabels.filter(q => edit && q.category_id === edit.id)}
+                       onClose={() => { setEdit(null); setCreating(false); }}
+                       onSaved={async () => { setEdit(null); setCreating(false); await onChanged(); }} />
+      )}
+    </div>
+  );
+}
+
+function CategoryModal({ cat, quicklabels, onClose, onSaved }: {
+  cat: CashCategory | null;
+  quicklabels: CashQuicklabel[];
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const [hu, setHu] = useState(cat?.name_hu ?? "");
+  const [ro, setRo] = useState(cat?.name_ro ?? "");
+  const [reqV, setReqV] = useState(cat?.req_vehicle ?? false);
+  const [reqC, setReqC] = useState(cat?.req_client ?? false);
+  const [reqD, setReqD] = useState(cat?.req_desc ?? false);
+  const [staff, setStaff] = useState(cat?.staff_can_use ?? true);
+  const [approved, setApproved] = useState(cat?.approved ?? true);
+  const [active, setActive] = useState(cat?.active ?? true);
+  const [labels, setLabels] = useState(quicklabels.map(q => q.label).join(", "));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function save() {
+    if (!hu.trim()) return;
+    setBusy(true); setErr("");
+    try {
+      const row = { name_hu: hu.trim(), name_ro: ro.trim() || null, req_vehicle: reqV,
+                    req_client: reqC, req_desc: reqD, staff_can_use: staff, approved, active };
+      let catId = cat?.id;
+      if (cat) {
+        const { error } = await supabase.from("cash_categories").update(row).eq("id", cat.id);
+        if (error) throw new Error(error.message);
+      } else {
+        const { data, error } = await supabase.from("cash_categories").insert(row).select("id").single();
+        if (error) throw new Error(error.message);
+        catId = (data as { id: string }).id;
+      }
+      if (catId) {
+        const want = labels.split(",").map(s => s.trim()).filter(Boolean);
+        const { error: de } = await supabase.from("cash_quicklabels").delete().eq("category_id", catId);
+        if (de) throw new Error(de.message);
+        if (want.length) {
+          const { error: ie } = await supabase.from("cash_quicklabels")
+            .insert(want.map(label => ({ category_id: catId, label })));
+          if (ie) throw new Error(ie.message);
+        }
+      }
+      await onSaved();
+    } catch (e) { setErr((e as Error).message); setBusy(false); }
+  }
+
+  return (
+    <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        <h3>{cat ? t("pz_edit_cat") : t("pz_new_cat")}</h3>
+        <label>{t("f_name_hu")}</label>
+        <input type="text" value={hu} onChange={e => setHu(e.target.value)} autoFocus />
+        <label>{t("f_name_ro")}</label>
+        <input type="text" value={ro} onChange={e => setRo(e.target.value)} />
+        <label>{t("pz_req_fields")}</label>
+        <div className="chk"><input id="rv" type="checkbox" checked={reqV} onChange={e => setReqV(e.target.checked)} /><label htmlFor="rv" style={{ textTransform: "none", margin: 0 }}>{t("pz_vehicle")}</label></div>
+        <div className="chk"><input id="rc" type="checkbox" checked={reqC} onChange={e => setReqC(e.target.checked)} /><label htmlFor="rc" style={{ textTransform: "none", margin: 0 }}>{t("pz_client")}</label></div>
+        <div className="chk"><input id="rd" type="checkbox" checked={reqD} onChange={e => setReqD(e.target.checked)} /><label htmlFor="rd" style={{ textTransform: "none", margin: 0 }}>{t("pz_desc")}</label></div>
+        <label>{t("pz_settings")}</label>
+        <div className="chk"><input id="st" type="checkbox" checked={staff} onChange={e => setStaff(e.target.checked)} /><label htmlFor="st" style={{ textTransform: "none", margin: 0 }}>{t("pz_staff_use")}</label></div>
+        <div className="chk"><input id="ap" type="checkbox" checked={approved} onChange={e => setApproved(e.target.checked)} /><label htmlFor="ap" style={{ textTransform: "none", margin: 0 }}>{t("pz_approved")}</label></div>
+        <div className="chk"><input id="ac" type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} /><label htmlFor="ac" style={{ textTransform: "none", margin: 0 }}>{t("pz_active")}</label></div>
+        <label>{t("pz_labels")}</label>
+        <input type="text" value={labels} placeholder="olaj, mosás, verificare"
+               onChange={e => setLabels(e.target.value)} />
+        {err && <div className="err">{err}</div>}
+        <div className="btns">
+          <button className="btn-cancel" onClick={onClose}>{t("cancel")}</button>
+          <button className="btn-save" onClick={save} disabled={busy || !hu.trim()}>{t("save")}</button>
         </div>
       </div>
     </div>

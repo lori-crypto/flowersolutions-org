@@ -12,6 +12,7 @@ export type CashUnit = {
 };
 export type CashDay = {
   id: string; unit_id: string; day: string; status: string;
+  closed_by: string | null;
   float_morning: number | null; float_evening: number | null;
   counted_cash: number | null; z_cash: number | null; z_card: number | null;
   pos_settlement: number | null; nexus_revenue: number | null;
@@ -124,6 +125,42 @@ export async function uploadReceipt(file: File): Promise<string> {
   const { error } = await supabase.storage.from("bizonylatok").upload(path, file);
   fail(error);
   return path;
+}
+
+export type OverviewDay = CashDay & {
+  cash_units: { name_hu: string; name_ro: string | null; kind: string } | null;
+};
+
+export async function cashOverview(from: string, to: string): Promise<{
+  days: OverviewDay[]; expenses: (CashExpense & { day_id: string | null; day: string; kind: string })[];
+  persons: Map<string, string>;
+}> {
+  const [dQ, eQ, pQ] = await Promise.all([
+    supabase.from("cash_days").select("*, cash_units(name_hu, name_ro, kind)")
+      .gte("day", from).lte("day", to).order("day", { ascending: false }),
+    supabase.from("cash_expenses").select("*").gte("day", from).lte("day", to),
+    supabase.from("persons").select("id, name"),
+  ]);
+  fail(dQ.error); fail(eQ.error); fail(pQ.error);
+  return {
+    days: (dQ.data as unknown as OverviewDay[]) ?? [],
+    expenses: (eQ.data as (CashExpense & { day_id: string | null; day: string; kind: string })[]) ?? [],
+    persons: new Map(((pQ.data as { id: string; name: string }[]) ?? []).map(p => [p.id, p.name])),
+  };
+}
+
+export async function cashMonetarOf(dayId: string): Promise<{ denom: number; qty: number }[]> {
+  const { data, error } = await supabase.from("cash_monetar")
+    .select("denom, qty").eq("day_id", dayId).order("denom", { ascending: false });
+  fail(error);
+  return (data as { denom: number; qty: number }[]) ?? [];
+}
+
+export async function cashReview(dayId: string, action: "elfogad" | "visszakuld", note?: string): Promise<void> {
+  const { error } = await supabase.rpc("app_cash_review", {
+    p_day_id: dayId, p_action: action, p_note: note || null,
+  });
+  fail(error);
 }
 
 export async function receiptUrl(path: string): Promise<string> {
