@@ -10,7 +10,7 @@ import {
   cashBalance, cashLedger, cashQuickAdd, uploadReceipt, receiptUrl,
   cashOverview, cashMonetarOf, cashReview, CashExpense,
   cashClients, cashPendingResolve, PendingItem,
-  cashReopenDay, cashDayDetail,
+  cashReopenDay, cashDayDetail, cashBalanceAt,
 } from "@/lib/penztar";
 
 const fmt = (n: number) =>
@@ -1376,6 +1376,9 @@ function HaviTab({ units }: { units: CashUnit[] }) {
   const [ym, setYm] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
   const [days, setDays] = useState<OverviewDay[] | null>(null);
   const [expenses, setExpenses] = useState<(CashExpense & { day_id: string | null; day: string; kind: string })[]>([]);
+  const [balStart, setBalStart] = useState<number | null>(null);
+  const [balEnd, setBalEnd] = useState<number | null>(null);
+  const [expDay, setExpDay] = useState<string | null>(null);
   const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
@@ -1384,8 +1387,11 @@ function HaviTab({ units }: { units: CashUnit[] }) {
       const [y, m] = ym.split("-").map(Number);
       const from = `${ym}-01`;
       const to = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+      const nextFirst = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
       const o = await withAuthRetry(() => cashOverview(from, to));
       setDays(o.days); setExpenses(o.expenses);
+      setBalStart(await withAuthRetry(() => cashBalanceAt(from)));
+      setBalEnd(await withAuthRetry(() => cashBalanceAt(nextFirst)));
     } catch (e) { setErr((e as Error).message); }
   }, [ym]);
   useEffect(() => { load(); }, [load]);
@@ -1465,7 +1471,7 @@ function HaviTab({ units }: { units: CashUnit[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {err && <div className="leave-err">{err}</div>}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <button className="mini-btn" onClick={() => shift(-1)}>‹</button>
         <b style={{ fontSize: 15 }}>{ym}</b>
         <button className="mini-btn" onClick={() => shift(1)}>›</button>
@@ -1473,6 +1479,23 @@ function HaviTab({ units }: { units: CashUnit[] }) {
         <span className="muted" style={{ fontSize: 12.5 }}>
           {t("pz_havi_total")}: <b style={{ color: "#1d5a33" }}>{fmt(grand)}</b> · {t("pz_expenses")}: <b style={{ color: "#b3431f" }}>{fmt(colTotals["exp"] ?? 0)}</b>
         </span>
+      </div>
+
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-l">{t("pz_month_open")} — {ym}-01</div>
+          <div className="kpi-v">{balStart != null ? fmt(balStart) : "…"}</div>
+        </div>
+        <div className="kpi-card" style={{ background: "#1d5a33", borderColor: "#1d5a33" }}>
+          <div className="kpi-l" style={{ color: "#bfdcc9" }}>{t("pz_month_close")}</div>
+          <div className="kpi-v" style={{ color: "#fff" }}>{balEnd != null ? fmt(balEnd) : "…"}</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-l">{t("pz_month_change")}</div>
+          <div className="kpi-v" style={{ color: (balEnd ?? 0) - (balStart ?? 0) >= 0 ? "#1d5a33" : "#b3431f" }}>
+            {balStart != null && balEnd != null ? (balEnd - balStart >= 0 ? "+" : "") + fmt(balEnd - balStart) : "…"}
+          </div>
+        </div>
       </div>
 
       <div className="stat-card" style={{ padding: 0, overflow: "hidden" }}>
@@ -1546,8 +1569,16 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                       const c = cashOf(u, day);
                       return <td key={u.id} style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>{c != null ? fmt(c) : ""}</td>;
                     })}
-                    <td style={{ ...td, borderLeft: "1px solid #f0f3f1", color: exp ? "#b3431f" : undefined }}>
-                      {exp ? fmt(exp) : ""}
+                    <td style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>
+                      {exp ? (
+                        <button onClick={() => setExpDay(day)}
+                                style={{ border: "none", background: "none", cursor: "pointer",
+                                         font: "inherit", color: "#b3431f", fontWeight: 600,
+                                         textDecoration: "underline", textDecorationStyle: "dotted",
+                                         padding: 0, fontVariantNumeric: "tabular-nums" }}>
+                          {fmt(exp)}
+                        </button>
+                      ) : ""}
                     </td>
                     <td style={{ ...td, borderLeft: "1px solid #f0f3f1", fontWeight: 700 }}>
                       {empty ? "" : fmt(rowSum - exp)}
@@ -1578,6 +1609,47 @@ function HaviTab({ units }: { units: CashUnit[] }) {
           ))}
         </div>
       </div>
+
+      {expDay && (
+        <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setExpDay(null); }}>
+          <div className="modal">
+            <h3>{t("pz_expenses")} — {expDay}</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 4 }}>
+              {expenses.filter(e => e.day === expDay).map((e, i) => {
+                const uid = (e as unknown as { unit_id: string | null }).unit_id;
+                const un = units.find(u => u.id === uid);
+                return (
+                  <div key={i} style={{ display: "flex", gap: 10, fontSize: 13.5, alignItems: "baseline",
+                                        borderBottom: "1px solid #f0f3f1", paddingBottom: 6 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>
+                        {e.description || (e.kind === "letet" ? t("pz_k_letet") : e.kind === "korrekcio" ? t("pz_k_korrekcio") : "—")}
+                      </div>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {[un ? pick(un.name_hu, un.name_ro ?? un.name_hu) : t("pz_quick_title"),
+                          e.client_name].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <b style={{ fontVariantNumeric: "tabular-nums",
+                                color: e.kind === "koltseg" ? "#b3431f" : "#33528a" }}>
+                      {fmt(Number(e.amount))}
+                    </b>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontWeight: 800 }}>
+              <span>{t("pz_expenses")}</span>
+              <span style={{ fontVariantNumeric: "tabular-nums", color: "#b3431f" }}>
+                {fmt(expByDay.get(expDay) ?? 0)}
+              </span>
+            </div>
+            <div className="btns">
+              <button className="btn-cancel" onClick={() => setExpDay(null)}>{t("close")}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

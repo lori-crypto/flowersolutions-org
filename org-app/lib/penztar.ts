@@ -124,6 +124,12 @@ export async function cashBalance(): Promise<{
   return data as { opening_balance: number; opening_date: string; balance: number; pending_open?: number };
 }
 
+export async function cashBalanceAt(date: string): Promise<number> {
+  const { data, error } = await supabase.rpc("app_cash_balance_at", { p_date: date });
+  fail(error);
+  return Number(data) || 0;
+}
+
 export async function cashLedger(from: string, to: string): Promise<LedgerEntry[]> {
   const { data, error } = await supabase.rpc("app_cash_ledger", { p_from: from, p_to: to });
   fail(error);
