@@ -41,6 +41,7 @@ export default function KollegakPage() {
   const [cashMembers, setCashMembers] = useState<{ unit_id: string; person_id: string }[]>([]);
   const [edit, setEdit] = useState<PersonRow | null>(null);
   const [accountFor, setAccountFor] = useState<PersonRow | null>(null);
+  const [pwFor, setPwFor] = useState<PersonRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [err, setErr] = useState("");
 
@@ -138,7 +139,13 @@ export default function KollegakPage() {
               <b>{p.name}</b>
               {!p.active && <span className="empty-tag">{t("p_inactive")}</span>}
               {p.user_id
-                ? <span className="acct-tag ok">✓ {t("p_account")}</span>
+                ? <>
+                    <span className="acct-tag ok">✓ {t("p_account")}</span>
+                    {isAdmin && (
+                      <button className="pencil" title={t("p_reset_pw")}
+                              onClick={() => setPwFor(p)}>🔑</button>
+                    )}
+                  </>
                 : <>
                     <span className="acct-tag">{t("p_no_account")}</span>
                     {isAdmin && p.active && (
@@ -223,6 +230,9 @@ export default function KollegakPage() {
         <AccountModal person={accountFor}
                       onClose={async () => { setAccountFor(null); await reload(); }} />
       )}
+      {pwFor && (
+        <ResetPwModal person={pwFor} onClose={() => setPwFor(null)} />
+      )}
     </>
   );
 }
@@ -291,6 +301,69 @@ function AccountModal({ person, onClose }: {
             <div className="fhint" style={{ background: "#e6f4ea", color: "#1d5a33" }}>{t("p_acct_done")}</div>
             <label>{t("p_email")}</label>
             <input type="text" value={email} readOnly />
+            <label>{t("p_acct_pw")}</label>
+            <input type="text" value={pw} readOnly
+                   style={{ fontFamily: "ui-monospace, Consolas, monospace", fontWeight: 700, fontSize: 16 }} />
+            <div className="btns">
+              <button className="btn-save" onClick={onClose}>{t("close")}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResetPwModal({ person, onClose }: {
+  person: PersonRow;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const [pw, setPw] = useState(genPassword());
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function save() {
+    setBusy(true); setErr("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Nincs bejelentkezés. / Nu ești autentificat.");
+      const r = await fetch("/api/reset-password", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ person_id: person.id, password: pw }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Hiba");
+      setDone(true);
+    } catch (e) { setErr((e as Error).message); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="overlay" onClick={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <div className="modal">
+        <h3>{t("p_reset_pw")} — {person.name}</h3>
+        {!done ? (
+          <>
+            <label>{t("p_acct_pw")}</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="text" value={pw} onChange={e => setPw(e.target.value)}
+                     style={{ fontFamily: "ui-monospace, Consolas, monospace", fontWeight: 700 }} />
+              <button className="mini-btn" onClick={() => setPw(genPassword())}>↻</button>
+            </div>
+            {err && <div className="err">{err}</div>}
+            <div className="btns">
+              <button className="btn-cancel" onClick={onClose} disabled={busy}>{t("cancel")}</button>
+              <button className="btn-save" onClick={save} disabled={busy || pw.length < 8}>
+                {busy ? "⏳" : t("p_acct_btn")}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="fhint" style={{ background: "#e6f4ea", color: "#1d5a33" }}>{t("p_acct_done")}</div>
             <label>{t("p_acct_pw")}</label>
             <input type="text" value={pw} readOnly
                    style={{ fontFamily: "ui-monospace, Consolas, monospace", fontWeight: 700, fontSize: 16 }} />

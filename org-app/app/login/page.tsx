@@ -31,7 +31,14 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true); setErr(""); setOk("");
     try { localStorage.setItem(REMEMBER_KEY, remember ? "1" : "0"); } catch {}
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // telefonszámmal is lehet: ilyenkor megkeressük a hozzá tartozó emailt
+    let loginEmail = email.trim();
+    if (!loginEmail.includes("@")) {
+      const { data: found } = await supabase.rpc("app_login_email_for_phone", { p_phone: loginEmail });
+      if (!found) { setBusy(false); setErr(t("login_error")); return; }
+      loginEmail = found as string;
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
     setBusy(false);
     if (error) { setErr(t("login_error")); return; }
     const caps = await fetchMyCaps();
@@ -50,7 +57,7 @@ export default function LoginPage() {
       <form className="login-card" onSubmit={signIn}>
         <h1>FS Org</h1>
         <div className="sub">Flower Solutions — {t("login_title")}</div>
-        <label>{t("email")}</label>
+        <label>{t("login_id")}</label>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                autoComplete="email" required />
         <label>{t("password")}</label>
