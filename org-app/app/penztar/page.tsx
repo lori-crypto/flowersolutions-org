@@ -1241,7 +1241,15 @@ function printDay(
   table{border-collapse:collapse;width:100%}td{padding:3px 8px;border-bottom:1px solid #eee}
   .tot{font-weight:700;border-top:1.5px solid #333}
   .sig{margin-top:40px;display:flex;gap:40px}.sig div{flex:1;border-top:1px solid #333;padding-top:4px;font-size:12px;text-align:center}
+  .bar{position:sticky;top:0;display:flex;gap:10px;background:#fff;padding:10px 0;border-bottom:1px solid #ddd;margin-bottom:12px}
+  .bar button{font:inherit;font-weight:600;padding:12px 20px;border:1.5px solid #999;border-radius:10px;background:#f5f5f5;cursor:pointer}
+  .bar .p{background:#2f7a4f;color:#fff;border-color:#2f7a4f}
+  @media print{.bar{display:none}}
   </style></head><body>
+  <div class="bar">
+    <button class="p" onclick="window.print()">🖨 ${ro ? "Imprimare" : "Nyomtatás"}</button>
+    <button onclick="window.close(); setTimeout(function(){ try { history.back(); } catch(e) {} }, 250);">✕ ${ro ? "Închide" : "Bezárás"}</button>
+  </div>
   <h1>${ro ? "FOAIE DE EVIDENȚĂ" : "KASSZAZÁRÁS"} — ${esc(uname ?? "")}</h1>
   <div>${d.day} · ${esc(d.closed_by ? persons.get(d.closed_by) ?? "" : "")} · ${esc(d.status)}</div>
   <h2>Monetar</h2><table>${rows}<tr class="tot"><td colspan="3">${ro ? "Numerar numărat" : "Megszámolt készpénz"}</td><td style="text-align:right">${fmt(d.counted_cash ?? 0)}</td></tr></table>
@@ -1254,7 +1262,7 @@ function printDay(
   ${d.expl_cash ? `<h2>${ro ? "Explicație numerar" : "Készpénz-indoklás"}</h2><div>${esc(d.expl_cash)}</div>` : ""}
   ${d.expl_card ? `<h2>${ro ? "Explicație card" : "Kártya-indoklás"}</h2><div>${esc(d.expl_card)}</div>` : ""}
   <div class="sig"><div>${ro ? "Predat (semnătura)" : "Átadta (aláírás)"}</div><div>${ro ? "Preluat (semnătura)" : "Átvette (aláírás)"}</div></div>
-  <script>window.print()</script></body></html>`);
+  <script>if (window.matchMedia("(min-width: 700px)").matches) window.print();</script></body></html>`);
   w.document.close();
 }
 
