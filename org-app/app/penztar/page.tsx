@@ -1831,6 +1831,40 @@ function OfficeTab() {
         )}
         {open.map(d => <OfficeCard key={d.id} d={d} people={people} onSaved={load} />)}
 
+        {done.length > 0 && (() => {
+          const batches = new Map<string, { name: string; date: string; days: OfficeDay[]; total: number }>();
+          for (const d of done) {
+            const date = (d.ver_at ?? "").slice(0, 5);
+            const k = (d.handed_to ?? "?") + "|" + date;
+            const b = batches.get(k) ?? { name: d.handed_to_name ?? "—", date, days: [], total: 0 };
+            b.days.push(d);
+            b.total += d.counted_cash ?? 0;
+            batches.set(k, b);
+          }
+          return (
+            <div className="stat-card" style={{ borderColor: "#cfdfd5" }}>
+              <b style={{ fontSize: 14 }}>{t("pz_off_batches")}</b>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                {[...batches.values()].map((b, i) => (
+                  <div key={i} style={{ border: "1px solid #e2e8e3", borderRadius: 12, padding: "11px 13px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <b style={{ fontSize: 14 }}>{b.date} → {b.name}</b>
+                      <span style={{ flex: 1 }} />
+                      <b style={{ fontSize: 17, color: "#1d5a33", fontVariantNumeric: "tabular-nums" }}>
+                        {fmt(b.total)} RON
+                      </b>
+                    </div>
+                    <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+                      {b.days.map(d =>
+                        `${pick(d.unit_name_hu, d.unit_name_ro ?? d.unit_name_hu)} ${d.day.slice(5)} (${fmt(d.counted_cash ?? 0)})`
+                      ).join(" · ")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {done.length > 0 && (
           <div className="stat-card">
             <b style={{ fontSize: 14 }}>{t("pz_off_done_title")}</b>

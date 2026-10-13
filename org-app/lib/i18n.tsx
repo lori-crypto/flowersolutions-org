@@ -180,6 +180,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   cap_penzell:      { hu: "Pénzellenőrzés (bolti pénzek átvétele)", ro: "Verificare bani (preluarea banilor din magazine)" },
   pz_off_all_done:  { hu: "Minden beérkezett bolti zárás ellenőrizve. ✓", ro: "Toate închiderile sosite din magazine sunt verificate. ✓" },
   pz_off_done_title:{ hu: "Ellenőrzött napok", ro: "Zile verificate" },
+  pz_off_batches:   { hu: "Átadások (összevonva: egy napon, ugyanannak átadott zárások)", ro: "Predări (grupate: închideri predate aceleiași persoane în aceeași zi)" },
   pz_off_zcash:     { hu: "Z-jelentés — készpénz", ro: "Raport Z — numerar" },
   pz_off_zcard:     { hu: "Z-jelentés — kártya", ro: "Raport Z — card" },
   pz_off_pos:       { hu: "POS settlement", ro: "Settlement POS" },
