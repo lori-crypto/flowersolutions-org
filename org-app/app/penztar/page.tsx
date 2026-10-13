@@ -1559,8 +1559,10 @@ function HaviTab({ units }: { units: CashUnit[] }) {
     return tot;
   }, [dmap, expByDay, ym]);
 
-  const grand = bolts.reduce((s, u) => s + (colTotals[u.id + "c"] ?? 0) + (colTotals[u.id + "k"] ?? 0), 0)
+  const grandCash = bolts.reduce((s, u) => s + (colTotals[u.id + "c"] ?? 0), 0)
     + lerakats.reduce((s, u) => s + (colTotals[u.id + "c"] ?? 0), 0);
+  const grandCard = bolts.reduce((s, u) => s + (colTotals[u.id + "k"] ?? 0), 0);
+  const grand = grandCash + grandCard;
 
   const monthExpenses = expenses
     .filter(e => e.kind === "koltseg" || e.day_id === null)
@@ -1618,6 +1620,8 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                   </th>
                 ))}
                 <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}>{t("pz_expenses")}</th>
+                <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}>KP Σ</th>
+                <th style={{ ...th }}>{t("pz_card")} Σ</th>
                 <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}>Σ</th>
               </tr>
               <tr style={{ background: "#f4f7f5" }}>
@@ -1630,6 +1634,8 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                 ))}
                 {lerakats.map(u => <th key={u.id} style={{ ...th, borderLeft: "1px solid #e2e8e3" }}>KP</th>)}
                 <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}></th>
+                <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}></th>
+                <th style={th}></th>
                 <th style={{ ...th, borderLeft: "1px solid #e2e8e3" }}></th>
               </tr>
               <tr style={{ background: "#eef6f0", fontWeight: 700 }}>
@@ -1645,9 +1651,13 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                 ))}
                 <td style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none", color: "#b3431f" }}>{fmt(colTotals["exp"] ?? 0)}</td>
                 <td style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none", color: "#1d5a33" }}>
-                  {fmt(grand - (colTotals["exp"] ?? 0) - (colTotals["open"] ?? 0))}
+                  {fmt(grandCash - (colTotals["exp"] ?? 0) - (colTotals["open"] ?? 0))}
                   {(colTotals["open"] ?? 0) > 0 && <div style={{ fontSize: 10.5, color: "#b3431f" }}>
                     {t("pz_pending_bal")}: {fmt(colTotals["open"] ?? 0)}</div>}
+                </td>
+                <td style={{ ...td, borderTop: "none", color: "#33528a" }}>{fmt(grandCard)}</td>
+                <td style={{ ...td, borderLeft: "1px solid #e2e8e3", borderTop: "none" }}>
+                  {fmt(grandCash + grandCard - (colTotals["exp"] ?? 0) - (colTotals["open"] ?? 0))}
                 </td>
               </tr>
             </thead>
@@ -1656,11 +1666,12 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                 <tr><td colSpan={99} style={{ ...td, textAlign: "center" }}>{t("loading")}</td></tr>
               ) : dayList.map(day => {
                 const exp = expByDay.get(day) ?? 0;
-                let rowSum = 0;
+                let rowCash = 0;
+                let rowCard = 0;
                 let rowOpen = 0;
-                for (const u of bolts) { rowSum += (cashOf(u, day) ?? 0) + (cardOf(u, day) ?? 0); rowOpen += openPendOf(u, day); }
-                for (const u of lerakats) { rowSum += cashOf(u, day) ?? 0; rowOpen += openPendOf(u, day); }
-                const empty = rowSum === 0 && exp === 0;
+                for (const u of bolts) { rowCash += cashOf(u, day) ?? 0; rowCard += cardOf(u, day) ?? 0; rowOpen += openPendOf(u, day); }
+                for (const u of lerakats) { rowCash += cashOf(u, day) ?? 0; rowOpen += openPendOf(u, day); }
+                const empty = rowCash === 0 && rowCard === 0 && exp === 0;
                 return (
                   <tr key={day} style={empty ? { color: "#b6beb9" } : undefined}>
                     <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{Number(day.slice(8))}</td>
@@ -1711,8 +1722,14 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                         </button>
                       ) : ""}
                     </td>
+                    <td style={{ ...td, borderLeft: "1px solid #f0f3f1", fontWeight: 700, color: "#1d5a33" }}>
+                      {empty ? "" : fmt(rowCash - exp - rowOpen)}
+                    </td>
+                    <td style={{ ...td, color: "#33528a" }}>
+                      {empty || rowCard === 0 ? "" : fmt(rowCard)}
+                    </td>
                     <td style={{ ...td, borderLeft: "1px solid #f0f3f1", fontWeight: 700 }}>
-                      {empty ? "" : fmt(rowSum - exp - rowOpen)}
+                      {empty ? "" : fmt(rowCash + rowCard - exp - rowOpen)}
                     </td>
                   </tr>
                 );
