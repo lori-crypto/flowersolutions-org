@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { TopNav } from "@/lib/TopNav";
+import { TopNav, fetchMyCaps, capHas } from "@/lib/TopNav";
 import {
   Board, Division, Department, Post, Group,
   loadBoard, updateOrgEvt, upsertDivision, deleteDivision,
@@ -20,6 +20,7 @@ export default function TablaPage() {
   const router = useRouter();
   const [board, setBoard] = useState<Board | null>(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [canView, setCanView] = useState<boolean | null>(null);
   const [editing, setEditing] = useState(false);
   const [modal, setModal] = useState<{ title: string; fields: Field[]; onSave: (v: FormValues) => Promise<void> } | null>(null);
   const [loadErr, setLoadErr] = useState("");
@@ -43,9 +44,9 @@ export default function TablaPage() {
         const c = localStorage.getItem("cache:board");
         if (c) setBoard(JSON.parse(c));
       } catch {}
-      const { data: caps } = await supabase.from("person_capabilities").select("capability");
-      const capSet = new Set((caps ?? []).map(c => c.capability));
-      setCanEdit(capSet.has("admin") || capSet.has("tabla.szerkesztes"));
+      const capSet = await fetchMyCaps();
+      setCanEdit(capHas(capSet, "tabla.szerkesztes"));
+      setCanView(capHas(capSet, "tabla"));
       await reload();
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((_e, sess) => {
@@ -197,6 +198,7 @@ export default function TablaPage() {
   }
 
   // ── megjelenítés ────────────────────────────────────────────
+  if (canView === false) return <div className="center-msg">{t("stat_no_access")}</div>;
   if (loadErr) return (
     <div className="center-msg">Hiba: {loadErr}<br />
       <button className="mini-btn" style={{ marginTop: 10 }}

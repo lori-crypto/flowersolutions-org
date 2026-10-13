@@ -13,11 +13,14 @@ type PersonRow = {
 };
 
 const CAPS = [
-  { key: "admin", tk: "cap_admin" },
-  { key: "hr", tk: "cap_hr" },
+  { key: "tabla", tk: "cap_tabla_view" },
+  { key: "szabadsag", tk: "cap_szabadsag" },
+  { key: "posztleiras", tk: "cap_posztleiras_view" },
+  { key: "penztar", tk: "cap_penztar" },
   { key: "tabla.szerkesztes", tk: "cap_tabla" },
   { key: "posztleiras.szerkesztes", tk: "cap_posztleiras" },
-  { key: "penztar", tk: "cap_penztar" },
+  { key: "hr", tk: "cap_hr" },
+  { key: "admin", tk: "cap_admin" },
 ];
 
 const AV_COLORS = ["#2f6fed", "#0e7c86", "#b3541e", "#2e7d32", "#8e3b8e", "#c2851a", "#1565c0", "#5b5f97"];

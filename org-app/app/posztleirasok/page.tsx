@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { TopNav } from "@/lib/TopNav";
+import { TopNav, fetchMyCaps, capHas } from "@/lib/TopNav";
 import { loadPostList, PostMeta, DescStatus } from "@/lib/postdesc";
 
 type ListData = Awaited<ReturnType<typeof loadPostList>>;
@@ -14,16 +14,21 @@ export default function PosztleirasokPage() {
   const router = useRouter();
   const [data, setData] = useState<ListData | null>(null);
   const [err, setErr] = useState("");
+  const [canView, setCanView] = useState<boolean | null>(null);
 
   useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
+      const capSet = await fetchMyCaps();
+      if (!capHas(capSet, "posztleiras")) { setCanView(false); return; }
+      setCanView(true);
       try { setData(await withAuthRetry(() => loadPostList())); }
       catch (e) { setErr((e as Error).message); }
     })();
   }, [router]);
 
+  if (canView === false) return <div className="center-msg">{t("stat_no_access")}</div>;
   if (err) return <div className="center-msg">Hiba: {err}</div>;
   if (!data) return <div className="center-msg">{t("loading")}</div>;
 

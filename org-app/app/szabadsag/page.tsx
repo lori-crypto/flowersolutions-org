@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { TopNav } from "@/lib/TopNav";
+import { TopNav, fetchMyCaps, capHas } from "@/lib/TopNav";
 import { shortName } from "@/lib/names";
 import {
   LeaveStatic, LeaveEntry, Blackout, Holiday, Quota, Part,
@@ -45,6 +45,7 @@ export default function SzabadsagPage() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [quotasAll, setQuotasAll] = useState<Quota[]>([]);
   const [err, setErr] = useState("");
+  const [canView, setCanView] = useState<boolean | null>(null);
 
   const reloadYear = useCallback(async (b = boardId, y = year, meId = st?.me?.id ?? null) => {
     if (!b) return;
@@ -56,6 +57,9 @@ export default function SzabadsagPage() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
+      const capSet = await fetchMyCaps();
+      if (!capHas(capSet, "szabadsag")) { setCanView(false); return; }
+      setCanView(true);
       try {
         const s = await withAuthRetry(() => loadLeaveStatic());
         setSt(s);
@@ -119,6 +123,7 @@ export default function SzabadsagPage() {
               onClick={() => window.location.reload()}>↻ {t("retry")}</button>
     </div>
   );
+  if (canView === false) return <div className="center-msg">{t("stat_no_access")}</div>;
   if (!st || !data) return <div className="center-msg">{t("loading")}</div>;
 
   const board = st.boards.find(b => b.id === boardId);
