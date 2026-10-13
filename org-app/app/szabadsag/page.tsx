@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { TopNav, fetchMyCaps, capHas } from "@/lib/TopNav";
+import { TopNav, fetchMyCaps, capHas, routeForCaps, NoAccessScreen } from "@/lib/TopNav";
 import { shortName } from "@/lib/names";
 import {
   LeaveStatic, LeaveEntry, Blackout, Holiday, Quota, Part,
@@ -58,7 +58,11 @@ export default function SzabadsagPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
       const capSet = await fetchMyCaps();
-      if (!capHas(capSet, "szabadsag")) { setCanView(false); return; }
+      if (!capHas(capSet, "szabadsag")) {
+        const target = routeForCaps(capSet);
+        if (target && target !== "/szabadsag") { router.replace(target); return; }
+        setCanView(false); return;
+      }
       setCanView(true);
       try {
         const s = await withAuthRetry(() => loadLeaveStatic());
@@ -123,7 +127,7 @@ export default function SzabadsagPage() {
               onClick={() => window.location.reload()}>↻ {t("retry")}</button>
     </div>
   );
-  if (canView === false) return <div className="center-msg">{t("no_access")}</div>;
+  if (canView === false) return <NoAccessScreen active="leave" />;
   if (!st || !data) return <div className="center-msg">{t("loading")}</div>;
 
   const board = st.boards.find(b => b.id === boardId);

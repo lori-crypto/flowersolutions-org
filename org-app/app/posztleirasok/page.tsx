@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { TopNav, fetchMyCaps, capHas } from "@/lib/TopNav";
+import { TopNav, fetchMyCaps, capHas, routeForCaps, NoAccessScreen } from "@/lib/TopNav";
 import { loadPostList, PostMeta, DescStatus } from "@/lib/postdesc";
 
 type ListData = Awaited<ReturnType<typeof loadPostList>>;
@@ -21,14 +21,18 @@ export default function PosztleirasokPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
       const capSet = await fetchMyCaps();
-      if (!capHas(capSet, "posztleiras")) { setCanView(false); return; }
+      if (!capHas(capSet, "posztleiras")) {
+        const target = routeForCaps(capSet);
+        if (target && target !== "/posztleirasok") { router.replace(target); return; }
+        setCanView(false); return;
+      }
       setCanView(true);
       try { setData(await withAuthRetry(() => loadPostList())); }
       catch (e) { setErr((e as Error).message); }
     })();
   }, [router]);
 
-  if (canView === false) return <div className="center-msg">{t("no_access")}</div>;
+  if (canView === false) return <NoAccessScreen active="desc" />;
   if (err) return <div className="center-msg">Hiba: {err}</div>;
   if (!data) return <div className="center-msg">{t("loading")}</div>;
 

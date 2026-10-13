@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { TopNav, fetchMyCaps, capHas } from "@/lib/TopNav";
+import { TopNav, fetchMyCaps, capHas, routeForCaps, NoAccessScreen } from "@/lib/TopNav";
 import {
   Board, Division, Department, Post, Group,
   loadBoard, updateOrgEvt, upsertDivision, deleteDivision,
@@ -46,7 +46,12 @@ export default function TablaPage() {
       } catch {}
       const capSet = await fetchMyCaps();
       setCanEdit(capHas(capSet, "tabla.szerkesztes"));
-      setCanView(capHas(capSet, "tabla"));
+      if (!capHas(capSet, "tabla")) {
+        const target = routeForCaps(capSet);
+        if (target && target !== "/tabla") { router.replace(target); return; }
+        setCanView(false); return;
+      }
+      setCanView(true);
       await reload();
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((_e, sess) => {
@@ -198,7 +203,7 @@ export default function TablaPage() {
   }
 
   // ── megjelenítés ────────────────────────────────────────────
-  if (canView === false) return <div className="center-msg">{t("no_access")}</div>;
+  if (canView === false) return <NoAccessScreen active="tabla" />;
   if (loadErr) return (
     <div className="center-msg">Hiba: {loadErr}<br />
       <button className="mini-btn" style={{ marginTop: 10 }}

@@ -3,16 +3,20 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase, REMEMBER_KEY } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { fetchMyCaps, routeForCaps } from "@/lib/TopNav";
 
 export default function LoginPage() {
   const { t } = useI18n();
   const router = useRouter();
 
   // Ha már be vagy jelentkezve (pl. vissza-gesztussal kerültél ide),
-  // azonnal visszairányítunk a táblára.
+  // azonnal az első elérhető modulra irányítunk.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace("/tabla");
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) {
+        const caps = await fetchMyCaps();
+        router.replace(routeForCaps(caps) ?? "/tabla");
+      }
     });
   }, [router]);
   const [email, setEmail] = useState("");
@@ -30,7 +34,8 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) { setErr(t("login_error")); return; }
-    router.replace("/tabla");
+    const caps = await fetchMyCaps();
+    router.replace(routeForCaps(caps) ?? "/tabla");
   }
 
   async function forgot() {

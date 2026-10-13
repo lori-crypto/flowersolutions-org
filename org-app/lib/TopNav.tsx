@@ -19,6 +19,39 @@ export async function fetchMyCaps(): Promise<Set<string>> {
 export const capHas = (caps: Set<string> | null, c: string) =>
   !!caps && (caps.has(c) || caps.has("admin"));
 
+// Hová kerüljön a belépő: az első modul, amihez joga van
+export function routeForCaps(caps: Set<string>): string | null {
+  const has = (c: string) => caps.has(c) || caps.has("admin");
+  if (has("tabla")) return "/tabla";
+  if (has("szabadsag")) return "/szabadsag";
+  if (has("posztleiras")) return "/posztleirasok";
+  if (has("penztar") || has("hr")) return "/penztar";
+  return null;
+}
+
+// Tiltó képernyő fejléccel és menüvel — sosem zsákutca
+export function NoAccessScreen({ active }: {
+  active: "tabla" | "leave" | "people" | "desc" | "stat" | "penztar";
+}) {
+  const { t, lang, setLang } = useI18n();
+  return (
+    <>
+      <header className="appbar">
+        <span className="t">FS Org</span>
+        <TopNav active={active} />
+        <span className="sp" />
+        <select className="lang-select" value={lang}
+                onChange={e => setLang(e.target.value as "hu" | "ro")}>
+          <option value="hu">HU — magyar</option>
+          <option value="ro">RO — română</option>
+        </select>
+        <button className="lang-btn" onClick={() => supabase.auth.signOut()}>{t("sign_out")}</button>
+      </header>
+      <div className="center-msg">{t("no_access")}</div>
+    </>
+  );
+}
+
 // Jogosultság-tudatos felső menü: mindenki csak azokat a modulokat
 // látja, amelyek pipálva vannak nála. (A tényleges védelem az
 // adatbázisban van — ez a kényelmi réteg.)
