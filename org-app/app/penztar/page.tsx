@@ -12,6 +12,7 @@ import {
   cashOverview, cashMonetarOf, cashReview, CashExpense,
   cashClients, cashPendingResolve, PendingItem,
   cashReopenDay, cashDayDetail, cashBalanceAt,
+  OfficeDay, cashOfficeList, cashOfficeVerify,
 } from "@/lib/penztar";
 
 const fmt = (n: number) =>
@@ -33,7 +34,8 @@ export default function PenztarPage() {
   const [meta, setMeta] = useState<{ categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] } | null>(null);
   const [unitId, setUnitId] = useState<string | null>(null);
   const [isHr, setIsHr] = useState(false);
-  const [tab, setTab] = useState<"zaras" | "naplo" | "havi" | "ellenorzes" | "kategoriak">("zaras");
+  const [isOffice, setIsOffice] = useState(false);
+  const [tab, setTab] = useState<"zaras" | "naplo" | "havi" | "ellenorzes" | "kategoriak" | "office">("zaras");
   const [editing, setEditing] = useState<{ unit: CashUnit; day: string } | null>(null);
   const [err, setErr] = useState("");
   const [denied, setDenied] = useState(false);
@@ -60,6 +62,11 @@ export default function PenztarPage() {
       const mine = new Set((caps ?? [])
         .filter(c => c.person_id === me?.id).map(c => c.capability));
       setIsHr(mine.has("hr") || mine.has("admin"));
+      const office = mine.has("penz.ellenorzes") || mine.has("hr") || mine.has("admin");
+      setIsOffice(office);
+      if (mine.has("penz.ellenorzes") && !mine.has("hr") && !mine.has("admin") && !mine.has("penztar")) {
+        setTab("office");
+      }
       await reload();
     })();
   }, [router, reload]);
@@ -106,25 +113,35 @@ export default function PenztarPage() {
         <div className="leave-err" style={{ margin: 14 }}>{err}</div>
       ) : !ctx || !meta ? (
         <div className="center-msg">{t("loading")}</div>
-      ) : ctx.units.length === 0 && !isHr ? (
+      ) : ctx.units.length === 0 && !isHr && !isOffice ? (
         <div className="center-msg">{t("pz_no_unit")}</div>
       ) : (
         <div className="pz-wrap" style={tab !== "zaras" ? { maxWidth: 1060 } : undefined}>
-          {isHr && (
+          {(isHr || isOffice) && (
             <div className="board-chips" style={{ marginBottom: 12 }}>
-              <button className={"bchip" + (tab === "zaras" ? " on" : "")}
-                      onClick={() => setTab("zaras")}>{t("pz_tab_zaras")}</button>
-              <button className={"bchip" + (tab === "naplo" ? " on" : "")}
-                      onClick={() => setTab("naplo")}>{t("pz_tab_naplo")}</button>
-              <button className={"bchip" + (tab === "havi" ? " on" : "")}
-                      onClick={() => setTab("havi")}>{t("pz_tab_havi")}</button>
-              <button className={"bchip" + (tab === "ellenorzes" ? " on" : "")}
-                      onClick={() => setTab("ellenorzes")}>{t("pz_tab_ellenorzes")}</button>
-              <button className={"bchip" + (tab === "kategoriak" ? " on" : "")}
-                      onClick={() => setTab("kategoriak")}>{t("pz_tab_kategoriak")}</button>
+              {(isHr || ctx.units.length > 0) && (
+                <button className={"bchip" + (tab === "zaras" ? " on" : "")}
+                        onClick={() => setTab("zaras")}>{t("pz_tab_zaras")}</button>
+              )}
+              {isOffice && (
+                <button className={"bchip" + (tab === "office" ? " on" : "")}
+                        onClick={() => setTab("office")}>{t("pz_tab_office")}</button>
+              )}
+              {isHr && (<>
+                <button className={"bchip" + (tab === "naplo" ? " on" : "")}
+                        onClick={() => setTab("naplo")}>{t("pz_tab_naplo")}</button>
+                <button className={"bchip" + (tab === "havi" ? " on" : "")}
+                        onClick={() => setTab("havi")}>{t("pz_tab_havi")}</button>
+                <button className={"bchip" + (tab === "ellenorzes" ? " on" : "")}
+                        onClick={() => setTab("ellenorzes")}>{t("pz_tab_ellenorzes")}</button>
+                <button className={"bchip" + (tab === "kategoriak" ? " on" : "")}
+                        onClick={() => setTab("kategoriak")}>{t("pz_tab_kategoriak")}</button>
+              </>)}
             </div>
           )}
-          {tab === "naplo" && isHr ? (
+          {tab === "office" && isOffice ? (
+            <OfficeTab />
+          ) : tab === "naplo" && isHr ? (
             <NaploTab meta={meta} units={ctx.units} />
           ) : tab === "havi" && isHr ? (
             <HaviTab units={ctx.units} />
@@ -1647,14 +1664,25 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                     {bolts.map(u => {
                       const c = cashOf(u, day); const k = cardOf(u, day);
                       const op = openPendOf(u, day);
+                      const rec = dmap.get(u.id + "|" + day);
+                      const vcol = (tick?: boolean) =>
+                        rec?.ver_status == null ? undefined
+                        : tick ? "#1d5a33"
+                        : "#9a6c10";
                       return (
                         <React.Fragment key={u.id}>
-                          <td style={{ ...td, borderLeft: "1px solid #f0f3f1" }}>
+                          <td style={{ ...td, borderLeft: "1px solid #f0f3f1", color: vcol(rec?.ver_cash),
+                                       fontWeight: rec?.ver_status ? 700 : undefined }}
+                              title={rec?.ver_note ?? undefined}>
                             {c != null ? fmt(c) : ""}
                             {op > 0 && <div style={{ fontSize: 10.5, color: "#b3431f", fontWeight: 700 }}>
                               {t("pz_pending_bal")}: {fmt(op)}</div>}
                           </td>
-                          <td style={td}>{k != null ? fmt(k) : ""}</td>
+                          <td style={{ ...td, color: vcol(rec?.ver_pos),
+                                       fontWeight: rec?.ver_status ? 700 : undefined }}
+                              title={rec?.ver_note ?? undefined}>
+                            {k != null ? fmt(k) : ""}
+                          </td>
                         </React.Fragment>
                       );
                     })}
@@ -1750,6 +1778,166 @@ function HaviTab({ units }: { units: CashUnit[] }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ══════════ PÉNZELLENŐRZÉS (irodai — Edit nézete) ══════════ */
+function OfficeTab() {
+  const { t, pick } = useI18n();
+  const now = new Date();
+  const [ym, setYm] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [days, setDays] = useState<OfficeDay[] | null>(null);
+  const [people, setPeople] = useState<{ id: string; name: string; is_default: boolean }[]>([]);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    setErr("");
+    try {
+      const [y, m] = ym.split("-").map(Number);
+      const from = `${ym}-01`;
+      const to = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+      const r = await withAuthRetry(() => cashOfficeList(from, to));
+      setDays(r.days); setPeople(r.handover_people);
+    } catch (e) { setErr((e as Error).message); }
+  }, [ym]);
+  useEffect(() => { load(); }, [load]);
+
+  const shift = (d: number) => {
+    const [y, m] = ym.split("-").map(Number);
+    const n = new Date(y, m - 1 + d, 1);
+    setYm(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const open = (days ?? []).filter(d => !d.ver_status);
+  const done = (days ?? []).filter(d => d.ver_status);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {err && <div className="leave-err">{err}</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <b style={{ fontSize: 15, flex: 1 }}>{t("pz_tab_office")}</b>
+        <button className="mini-btn" onClick={() => shift(-1)}>‹</button>
+        <b style={{ fontSize: 14 }}>{ym}</b>
+        <button className="mini-btn" onClick={() => shift(1)}>›</button>
+      </div>
+
+      {!days ? <div className="muted">{t("loading")}</div> : (<>
+        {open.length === 0 && (
+          <div className="fhint" style={{ background: "#e6f2ea", color: "#1d5a33" }}>{t("pz_off_all_done")}</div>
+        )}
+        {open.map(d => <OfficeCard key={d.id} d={d} people={people} onSaved={load} />)}
+
+        {done.length > 0 && (
+          <div className="stat-card">
+            <b style={{ fontSize: 14 }}>{t("pz_off_done_title")}</b>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 8 }}>
+              {done.map(d => (
+                <div key={d.id} className="pz-exp"
+                     style={d.ver_status === "elteres" ? { borderColor: "#f0ddbb", background: "#fdf8ee" } : undefined}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b style={{ fontSize: 13.5 }}>{d.day}</b>
+                    <span className="pz-chip" style={{ marginLeft: 8 }}>{pick(d.unit_name_hu, d.unit_name_ro ?? d.unit_name_hu)}</span>
+                    <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
+                      {t("pz_off_handed")}: {d.handed_to_name ?? "—"} · {d.ver_by_name ?? ""} {d.ver_at ?? ""}
+                    </span>
+                    {d.ver_note && <div style={{ fontSize: 12.5, color: "#9a6c10" }}>„{d.ver_note}"</div>}
+                  </div>
+                  {d.ver_status === "rendben"
+                    ? <span className="pct-tag pos">{t("pz_off_ok")} ✓</span>
+                    : <span className="pct-tag neg">{t("pz_off_diff")}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </>)}
+    </div>
+  );
+}
+
+function OfficeCard({ d, people, onSaved }: {
+  d: OfficeDay;
+  people: { id: string; name: string; is_default: boolean }[];
+  onSaved: () => Promise<void>;
+}) {
+  const { t, pick } = useI18n();
+  const [zc, setZc] = useState(false);
+  const [zk, setZk] = useState(false);
+  const [po, setPo] = useState(false);
+  const [kp, setKp] = useState(false);
+  const [note, setNote] = useState("");
+  const [handed, setHanded] = useState(people.find(p => p.is_default)?.id ?? people[0]?.id ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const allOk = zc && zk && po && kp;
+
+  async function save() {
+    setBusy(true); setErr("");
+    try {
+      await withAuthRetry(() => cashOfficeVerify({
+        dayId: d.id, zCash: zc, zCard: zk, pos: po, cash: kp,
+        note: note.trim(), handed,
+      }));
+      await onSaved();
+    } catch (e) { setErr((e as Error).message); setBusy(false); }
+  }
+
+  const row = (label: string, value: number | null, checked: boolean, set: (v: boolean) => void) => (
+    <label style={{ display: "flex", alignItems: "center", gap: 10, border: "1px solid #edf1ee",
+                    borderRadius: 12, padding: "11px 13px", cursor: "pointer",
+                    background: checked ? "#eef6f0" : "#fff" }}>
+      <input type="checkbox" checked={checked} onChange={e => set(e.target.checked)}
+             style={{ width: 19, height: 19, accentColor: "#2f7a4f" }} />
+      <span style={{ flex: 1, fontSize: 14 }}>{label}</span>
+      <b style={{ fontSize: 15.5, fontVariantNumeric: "tabular-nums" }}>{value != null ? fmt(value) : "—"}</b>
+    </label>
+  );
+
+  return (
+    <div className="stat-card" style={{ borderColor: "#cfdfd5" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <b style={{ fontSize: 15 }}>{d.day}</b>
+        <span className="pz-chip">{pick(d.unit_name_hu, d.unit_name_ro ?? d.unit_name_hu)}</span>
+        <span className="muted" style={{ fontSize: 12.5 }}>{d.closed_by_name ?? ""}</span>
+        <span style={{ flex: 1 }} />
+        {d.cash_diff != null && Math.abs(d.cash_diff) > 1 && (
+          <span className="pct-tag neg">KP {d.cash_diff > 0 ? "+" : ""}{fmt(d.cash_diff)}</span>
+        )}
+      </div>
+      {(d.expl_cash || d.expl_card) && (
+        <div style={{ fontSize: 12.5, background: "#f6f8fb", borderRadius: 8, padding: "6px 9px", marginTop: 8 }}>
+          {d.expl_cash && <>KP: „{d.expl_cash}" </>}{d.expl_card && <>Card: „{d.expl_card}"</>}
+        </div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 10 }}>
+        {row(t("pz_off_zcash"), d.z_cash, zc, setZc)}
+        {row(t("pz_off_zcard"), d.z_card, zk, setZk)}
+        {row(t("pz_off_pos"), d.pos_settlement, po, setPo)}
+        {row(t("pz_off_cash"), d.counted_cash, kp, setKp)}
+      </div>
+      {!allOk && (
+        <label className="pz-field" style={{ marginTop: 10 }}>
+          <span>{t("pz_off_note")} {zc || zk || po || kp ? "*" : ""}</span>
+          <textarea rows={2} value={note} onChange={e => setNote(e.target.value)}
+                    placeholder={t("pz_off_note_ph")} />
+        </label>
+      )}
+      <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <label className="pz-field" style={{ minWidth: 200 }}>
+          <span>{t("pz_off_handed")}</span>
+          <select className="sel" value={handed} onChange={e => setHanded(e.target.value)}
+                  style={{ padding: "10px 12px", borderRadius: 10, border: "1.5px solid #cfd9d1" }}>
+            {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <button className="pz-close-btn" style={{ flex: 1, minWidth: 180, padding: "12px 18px" }}
+                disabled={busy || (!allOk && !note.trim())} onClick={save}>
+          {busy ? "⏳" : allOk ? t("pz_off_approve") : t("pz_off_save_diff")}
+        </button>
+      </div>
+      {err && <div className="leave-err" style={{ marginTop: 8 }}>{err}</div>}
+      <div className="fhint" style={{ marginTop: 8 }}>{t("pz_off_hint")}</div>
     </div>
   );
 }

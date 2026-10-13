@@ -17,6 +17,7 @@ const CAPS = [
   { key: "szabadsag", tk: "cap_szabadsag" },
   { key: "posztleiras", tk: "cap_posztleiras_view" },
   { key: "penztar", tk: "cap_penztar" },
+  { key: "penz.ellenorzes", tk: "cap_penzell" },
   { key: "tabla.szerkesztes", tk: "cap_tabla" },
   { key: "posztleiras.szerkesztes", tk: "cap_posztleiras" },
   { key: "hr", tk: "cap_hr" },

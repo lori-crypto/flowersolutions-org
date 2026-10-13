@@ -15,6 +15,9 @@ export type CashUnit = {
 export type CashDay = {
   id: string; unit_id: string; day: string; status: string;
   closed_by: string | null;
+  ver_status?: "rendben" | "elteres" | null;
+  ver_z_cash?: boolean; ver_z_card?: boolean; ver_pos?: boolean; ver_cash?: boolean;
+  ver_note?: string | null;
   float_morning: number | null; float_evening: number | null;
   counted_cash: number | null; z_cash: number | null; z_card: number | null;
   pos_settlement: number | null; nexus_revenue: number | null;
@@ -211,6 +214,40 @@ export async function cashClients(q: string): Promise<string[]> {
 
 export async function cashPendingResolve(id: string): Promise<void> {
   const { error } = await supabase.rpc("app_cash_pending_resolve", { p_id: id });
+  fail(error);
+}
+
+export type OfficeDay = {
+  id: string; day: string; status: string;
+  unit_name_hu: string; unit_name_ro: string | null;
+  closed_by_name: string | null;
+  counted_cash: number | null; z_cash: number | null;
+  z_card: number | null; pos_settlement: number | null;
+  cash_diff: number | null; card_diff: number | null;
+  expl_cash: string | null; expl_card: string | null;
+  ver_status: "rendben" | "elteres" | null;
+  ver_z_cash: boolean; ver_z_card: boolean; ver_pos: boolean; ver_cash: boolean;
+  ver_note: string | null; ver_at: string | null; ver_by_name: string | null;
+  handed_to: string | null; handed_to_name: string | null;
+};
+
+export async function cashOfficeList(from: string, to: string): Promise<{
+  days: OfficeDay[];
+  handover_people: { id: string; name: string; is_default: boolean }[];
+}> {
+  const { data, error } = await supabase.rpc("app_cash_office_list", { p_from: from, p_to: to });
+  fail(error);
+  return data as { days: OfficeDay[]; handover_people: { id: string; name: string; is_default: boolean }[] };
+}
+
+export async function cashOfficeVerify(p: {
+  dayId: string; zCash: boolean; zCard: boolean; pos: boolean; cash: boolean;
+  note: string; handed: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc("app_cash_office_verify", {
+    p_day_id: p.dayId, p_z_cash: p.zCash, p_z_card: p.zCard,
+    p_pos: p.pos, p_cash: p.cash, p_note: p.note || null, p_handed: p.handed,
+  });
   fail(error);
 }
 

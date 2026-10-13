@@ -25,7 +25,7 @@ export function routeForCaps(caps: Set<string>): string | null {
   if (has("tabla")) return "/tabla";
   if (has("szabadsag")) return "/szabadsag";
   if (has("posztleiras")) return "/posztleirasok";
-  if (has("penztar") || has("hr")) return "/penztar";
+  if (has("penztar") || has("hr") || has("penz.ellenorzes")) return "/penztar";
   return null;
 }
 
@@ -76,7 +76,7 @@ export function TopNav({ active }: {
     { k: "people", href: "/kollegak", label: t("nav_people"), show: hr },
     { k: "desc", href: "/posztleirasok", label: t("nav_desc"), show: has("posztleiras") },
     { k: "stat", href: "/statisztika", label: t("nav_stat"), show: hr },
-    { k: "penztar", href: "/penztar", label: t("nav_penztar"), show: hr || has("penztar") },
+    { k: "penztar", href: "/penztar", label: t("nav_penztar"), show: hr || has("penztar") || has("penz.ellenorzes") },
   ];
   return (
     <nav className="topnav">
