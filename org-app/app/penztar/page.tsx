@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
@@ -573,12 +573,36 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
     catch (e) { alert((e as Error).message); }
   }
 
+  // Automatikus piszkozatmentés: a beírt adatok akkor is rögzülnek,
+  // ha a kolléga elfelejti lezárni a napot. Csendes — hiba esetén a
+  // kézi mentés/zárás úgyis jelez.
+  const [autoAt, setAutoAt] = useState("");
+  const autoKey = JSON.stringify(payload());
+  const autoRef = useRef({ last: autoKey, saving: false, locked });
+  autoRef.current.locked = locked;
+  useEffect(() => {
+    if (locked || autoKey === autoRef.current.last) return;
+    const h = setTimeout(async () => {
+      if (autoRef.current.locked || autoRef.current.saving) return;
+      autoRef.current.saving = true;
+      try {
+        await withAuthRetry(() => cashSaveDay(unit.id, payload(), editDay));
+        autoRef.current.last = autoKey;
+        setAutoAt(new Date().toTimeString().slice(0, 5));
+      } catch { /* csendes */ }
+      autoRef.current.saving = false;
+    }, 2500);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoKey, locked]);
+
   async function save(closeToo: boolean) {
     if (closeToo && unit.kind === "bolt" && (!floatM.trim() || !floatE.trim())) {
       setErr(t("pz_err_float")); return;
     }
     setBusy(true); setErr(""); setMsg("");
     try {
+      autoRef.current.last = JSON.stringify(payload());
       await withAuthRetry(() => cashSaveDay(unit.id, payload(), editDay));
       if (closeToo) {
         await withAuthRetry(() => cashCloseDay(unit.id, editDay));
@@ -605,6 +629,9 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
         <b style={{ fontSize: 15 }}>{pick(unit.name_hu, unit.name_ro ?? unit.name_hu)}</b>
         <span className="muted">{today}</span>
         <span className="sp" style={{ flex: 1 }} />
+        {!locked && autoAt && (
+          <span className="muted" style={{ fontSize: 11.5 }}>✓ {t("pz_autosaved")} {autoAt}</span>
+        )}
         {locked
           ? <span className="pct-tag pos">{t("pz_st_lezart")} ✓</span>
           : d?.status === "visszakuldve"
