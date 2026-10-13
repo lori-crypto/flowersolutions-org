@@ -231,6 +231,8 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   p_create_acct:    { hu: "Fiók létrehozása", ro: "Creare cont" },
   p_acct_pw:        { hu: "Ideiglenes jelszó", ro: "Parolă temporară" },
   p_reset_pw:       { hu: "Új jelszó beállítása", ro: "Setare parolă nouă" },
+  p_acct_invite:    { hu: "Meghívó e-mail küldése a belépési adatokkal", ro: "Trimite email de invitație cu datele de acces" },
+  p_acct_emailed:   { hu: "A meghívót e-mailben is elküldtük.", ro: "Invitația a fost trimisă și pe email." },
   p_acct_btn:       { hu: "Létrehozás", ro: "Creează" },
   p_acct_hint:      { hu: "A fiók az email-címmel és ezzel az ideiglenes jelszóval jön létre. Add át a kollégának — belépés után az Elfelejtett jelszó gombbal bármikor sajátra cserélheti.", ro: "Contul se creează cu acest email și parola temporară. Transmite-le colegului — după autentificare o poate schimba oricând cu Am uitat parola." },
   p_acct_done:      { hu: "A fiók elkészült! Másold ki és add át a kollégának az alábbi belépési adatokat — ez a jelszó itt többé nem lesz látható.", ro: "Contul a fost creat! Copiază și transmite colegului datele de mai jos — parola nu va mai fi vizibilă aici." },

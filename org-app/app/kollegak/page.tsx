@@ -250,8 +250,10 @@ function AccountModal({ person, onClose }: {
   const { t } = useI18n();
   const [email, setEmail] = useState(person.email ?? "");
   const [pw, setPw] = useState(genPassword());
+  const [invite, setInvite] = useState(true);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [emailed, setEmailed] = useState(false);
   const [err, setErr] = useState("");
 
   async function create() {
@@ -262,10 +264,11 @@ function AccountModal({ person, onClose }: {
       const r = await fetch("/api/create-user", {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ person_id: person.id, email: email.trim(), password: pw }),
+        body: JSON.stringify({ person_id: person.id, email: email.trim(), password: pw, invite }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Hiba");
+      setEmailed(!!j.emailed);
       setDone(true);
     } catch (e) { setErr((e as Error).message); }
     setBusy(false);
@@ -286,6 +289,10 @@ function AccountModal({ person, onClose }: {
                      style={{ fontFamily: "ui-monospace, Consolas, monospace", fontWeight: 700 }} />
               <button className="mini-btn" onClick={() => setPw(genPassword())}>↻</button>
             </div>
+            <label className="remember-row" style={{ marginTop: 12 }}>
+              <input type="checkbox" checked={invite} onChange={e => setInvite(e.target.checked)} />
+              {t("p_acct_invite")}
+            </label>
             <div className="fhint" style={{ marginTop: 10 }}>{t("p_acct_hint")}</div>
             {err && <div className="err">{err}</div>}
             <div className="btns">
@@ -298,7 +305,9 @@ function AccountModal({ person, onClose }: {
           </>
         ) : (
           <>
-            <div className="fhint" style={{ background: "#e6f4ea", color: "#1d5a33" }}>{t("p_acct_done")}</div>
+            <div className="fhint" style={{ background: "#e6f4ea", color: "#1d5a33" }}>
+              {t("p_acct_done")}{emailed ? " " + t("p_acct_emailed") : ""}
+            </div>
             <label>{t("p_email")}</label>
             <input type="text" value={email} readOnly />
             <label>{t("p_acct_pw")}</label>
