@@ -714,6 +714,7 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
         )}
       </div>
 
+      {unit.kind === "lerakat" && (
       <div className="stat-card" style={pending.length || unit.pending_open.length ? { borderColor: "#eec6bd" } : undefined}>
         <div style={{ display: "flex", alignItems: "center" }}>
           <b style={{ fontSize: 13, color: "#5c6b61", flex: 1 }}>{t("pz_pending_title")}</b>
@@ -780,6 +781,7 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
         )}
         <div className="fhint" style={{ marginTop: 8 }}>{t("pz_pending_hint")}</div>
       </div>
+      )}
 
       {unit.kind === "bolt" && (
         <>
