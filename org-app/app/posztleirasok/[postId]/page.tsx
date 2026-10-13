@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { TopNav } from "@/lib/TopNav";
 import { mdToHtml } from "@/lib/md";
 import {
   loadPostDetail, saveDraft, publishDraft, upsertTerm, deleteTerm,
@@ -96,14 +97,7 @@ export default function PosztleirasDetailPage() {
     <>
       <header className="appbar">
         <span className="t">{t("pd_title")}</span>
-        <nav className="topnav">
-          <Link href="/tabla">{t("nav_tabla")}</Link>
-          <Link href="/szabadsag">{t("nav_leave")}</Link>
-          <Link href="/kollegak">{t("nav_people")}</Link>
-          <Link href="/posztleirasok" className="active">{t("nav_desc")}</Link>
-          <Link href="/statisztika">{t("nav_stat")}</Link>
-          <Link href="/penztar">{t("nav_penztar")}</Link>
-        </nav>
+        <TopNav active="desc" />
         <span className="sp" />
         <select className="lang-select" value={lang}
                 onChange={e => setLang(e.target.value as "hu" | "ro")}>

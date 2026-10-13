@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { TopNav } from "@/lib/TopNav";
 import {
   Board, Division, Department, Post, Group,
   loadBoard, updateOrgEvt, upsertDivision, deleteDivision,
@@ -236,14 +237,7 @@ export default function TablaPage() {
     <>
       <header className="appbar">
         <span className="t">{board.org.name} — {t("org_board")}</span>
-        <nav className="topnav">
-          <Link href="/tabla" className="active">{t("nav_tabla")}</Link>
-          <Link href="/szabadsag">{t("nav_leave")}</Link>
-          <Link href="/kollegak">{t("nav_people")}</Link>
-          <Link href="/posztleirasok">{t("nav_desc")}</Link>
-          <Link href="/statisztika">{t("nav_stat")}</Link>
-          <Link href="/penztar">{t("nav_penztar")}</Link>
-        </nav>
+        <TopNav active="tabla" />
         <span className="sp" />
         <button className="lang-btn" title="Frissítés / Reîmprospătare"
                 onClick={() => window.location.reload()}>↻</button>

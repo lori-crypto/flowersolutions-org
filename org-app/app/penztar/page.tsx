@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { TopNav } from "@/lib/TopNav";
 import {
   CashUnit, CashCategory, CashVehicle, CashQuicklabel, DayPayload, LedgerEntry, OverviewDay,
   cashContext, cashSaveDay, cashCloseDay, cashMeta, DENOMS,
@@ -88,13 +89,7 @@ export default function PenztarPage() {
     <>
       <header className="appbar">
         <span className="t">{t("pz_title")}</span>
-        <nav className="topnav">
-          <Link href="/tabla">{t("nav_tabla")}</Link>
-          <Link href="/szabadsag">{t("nav_leave")}</Link>
-          <Link href="/kollegak">{t("nav_people")}</Link>
-          <Link href="/statisztika">{t("nav_stat")}</Link>
-          <Link href="/penztar" className="active">{t("nav_penztar")}</Link>
-        </nav>
+        <TopNav active="penztar" />
         <span className="sp" />
         <button className="lang-btn" onClick={() => window.location.reload()}>↻</button>
         <select className="lang-select" value={lang}

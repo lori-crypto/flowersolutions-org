@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { TopNav } from "@/lib/TopNav";
 import { StatRow, CompareRow, CompareWeek, ProgressRow, statSales, statCompare, statCompareWeeks, statOptions, statProgress, statProductSearch, getCycles } from "@/lib/stats";
 
 const iso = (d: Date) =>
@@ -89,14 +90,7 @@ export default function StatisztikaPage() {
     <>
       <header className="appbar">
         <span className="t">{t("stat_title")}</span>
-        <nav className="topnav">
-          <Link href="/tabla">{t("nav_tabla")}</Link>
-          <Link href="/szabadsag">{t("nav_leave")}</Link>
-          <Link href="/kollegak">{t("nav_people")}</Link>
-          <Link href="/posztleirasok">{t("nav_desc")}</Link>
-          <Link href="/statisztika" className="active">{t("nav_stat")}</Link>
-          <Link href="/penztar">{t("nav_penztar")}</Link>
-        </nav>
+        <TopNav active="stat" />
         <span className="sp" />
         {isHr && (
           <button className="lang-btn" disabled={syncBusy} onClick={syncNow}

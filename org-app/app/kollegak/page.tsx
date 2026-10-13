@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, withAuthRetry } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { TopNav } from "@/lib/TopNav";
 import { LeaveBoard, BoardMember, setMembership } from "@/lib/leave";
 
 type PersonRow = {
@@ -108,14 +109,7 @@ export default function KollegakPage() {
     <>
       <header className="appbar">
         <span className="t">{t("people_title")}</span>
-        <nav className="topnav">
-          <Link href="/tabla">{t("nav_tabla")}</Link>
-          <Link href="/szabadsag">{t("nav_leave")}</Link>
-          <Link href="/kollegak" className="active">{t("nav_people")}</Link>
-          <Link href="/posztleirasok">{t("nav_desc")}</Link>
-          <Link href="/statisztika">{t("nav_stat")}</Link>
-          <Link href="/penztar">{t("nav_penztar")}</Link>
-        </nav>
+        <TopNav active="people" />
         <span className="sp" />
         <button className="lang-btn" title="Frissítés" onClick={() => window.location.reload()}>↻</button>
         <select className="lang-select" value={lang}
@@ -126,6 +120,9 @@ export default function KollegakPage() {
         <button className="lang-btn" onClick={() => supabase.auth.signOut()}>{t("sign_out")}</button>
       </header>
 
+      {!isHr ? (
+        <div className="center-msg">{t("stat_no_access")}</div>
+      ) : (
       <div className="people-wrap">
         {isHr && (
           <button className="add-btn" style={{ marginBottom: 12 }}
@@ -213,6 +210,7 @@ export default function KollegakPage() {
         ))}
         <div className="fhint" style={{ marginTop: 14 }}>{t("p_hint")}</div>
       </div>
+      )}
 
       {(adding || edit) && (
         <PersonForm person={edit} onClose={() => { setAdding(false); setEdit(null); }}
