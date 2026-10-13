@@ -198,7 +198,7 @@ export default function TablaPage() {
   }
 
   // ── megjelenítés ────────────────────────────────────────────
-  if (canView === false) return <div className="center-msg">{t("stat_no_access")}</div>;
+  if (canView === false) return <div className="center-msg">{t("no_access")}</div>;
   if (loadErr) return (
     <div className="center-msg">Hiba: {loadErr}<br />
       <button className="mini-btn" style={{ marginTop: 10 }}

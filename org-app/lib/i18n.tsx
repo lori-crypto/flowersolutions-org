@@ -237,6 +237,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   cap_tabla:        { hu: "Szervezési tábla szerkesztése", ro: "Editare organigramă" },
   cap_posztleiras:  { hu: "Posztleírások szerkesztése", ro: "Editare fișe de post" },
   cap_penztar:      { hu: "Pénztár (napi zárás kitöltése)", ro: "Casierie (completarea închiderii zilnice)" },
+  no_access:        { hu: "Nincs hozzáférésed ehhez a modulhoz — szólj a vezetőnek, ha szükséged van rá.", ro: "Nu ai acces la acest modul — anunță managerul dacă ai nevoie de el." },
   cap_tabla_view:   { hu: "Szervezési tábla (megtekintés)", ro: "Organigrama (vizualizare)" },
   cap_szabadsag:    { hu: "Szabadságos tábla", ro: "Planificator concedii" },
   cap_posztleiras_view: { hu: "Posztleírások (megtekintés)", ro: "Fișe de post (vizualizare)" },

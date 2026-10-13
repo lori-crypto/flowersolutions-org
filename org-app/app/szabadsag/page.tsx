@@ -123,7 +123,7 @@ export default function SzabadsagPage() {
               onClick={() => window.location.reload()}>↻ {t("retry")}</button>
     </div>
   );
-  if (canView === false) return <div className="center-msg">{t("stat_no_access")}</div>;
+  if (canView === false) return <div className="center-msg">{t("no_access")}</div>;
   if (!st || !data) return <div className="center-msg">{t("loading")}</div>;
 
   const board = st.boards.find(b => b.id === boardId);

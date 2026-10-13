@@ -28,7 +28,7 @@ export default function PosztleirasokPage() {
     })();
   }, [router]);
 
-  if (canView === false) return <div className="center-msg">{t("stat_no_access")}</div>;
+  if (canView === false) return <div className="center-msg">{t("no_access")}</div>;
   if (err) return <div className="center-msg">Hiba: {err}</div>;
   if (!data) return <div className="center-msg">{t("loading")}</div>;
 

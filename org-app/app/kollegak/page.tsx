@@ -124,7 +124,7 @@ export default function KollegakPage() {
       </header>
 
       {!isHr ? (
-        <div className="center-msg">{t("stat_no_access")}</div>
+        <div className="center-msg">{t("no_access")}</div>
       ) : (
       <div className="people-wrap">
         {isHr && (
