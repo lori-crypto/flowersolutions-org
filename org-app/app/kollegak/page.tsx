@@ -36,6 +36,7 @@ export default function KollegakPage() {
   const [cashUnits, setCashUnits] = useState<{ id: string; name_hu: string; name_ro: string | null; sort: number }[]>([]);
   const [cashMembers, setCashMembers] = useState<{ unit_id: string; person_id: string }[]>([]);
   const [edit, setEdit] = useState<PersonRow | null>(null);
+  const [accountFor, setAccountFor] = useState<PersonRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [err, setErr] = useState("");
 
@@ -138,7 +139,12 @@ export default function KollegakPage() {
               {!p.active && <span className="empty-tag">{t("p_inactive")}</span>}
               {p.user_id
                 ? <span className="acct-tag ok">✓ {t("p_account")}</span>
-                : <span className="acct-tag">{t("p_no_account")}</span>}
+                : <>
+                    <span className="acct-tag">{t("p_no_account")}</span>
+                    {isAdmin && p.active && (
+                      <button className="mini-btn" onClick={() => setAccountFor(p)}>＋ {t("p_create_acct")}</button>
+                    )}
+                  </>}
               <span className="sp" />
               {isHr && <>
                 <button className="pencil" onClick={() => setEdit(p)}>✎</button>
@@ -212,7 +218,88 @@ export default function KollegakPage() {
         <PersonForm person={edit} onClose={() => { setAdding(false); setEdit(null); }}
                     onSaved={async () => { setAdding(false); setEdit(null); await reload(); }} />
       )}
+      {accountFor && (
+        <AccountModal person={accountFor}
+                      onClose={async () => { setAccountFor(null); await reload(); }} />
+      )}
     </>
+  );
+}
+
+function genPassword(): string {
+  const a = Math.random().toString(36).replace(/[^a-z0-9]/g, "").slice(0, 5);
+  const n = Math.floor(1000 + Math.random() * 9000);
+  return `Fs-${a}-${n}`;
+}
+
+function AccountModal({ person, onClose }: {
+  person: PersonRow;
+  onClose: () => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const [email, setEmail] = useState(person.email ?? "");
+  const [pw, setPw] = useState(genPassword());
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function create() {
+    setBusy(true); setErr("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Nincs bejelentkezés. / Nu ești autentificat.");
+      const r = await fetch("/api/create-user", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ person_id: person.id, email: email.trim(), password: pw }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Hiba");
+      setDone(true);
+    } catch (e) { setErr((e as Error).message); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="overlay" onClick={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <div className="modal">
+        <h3>{t("p_create_acct")} — {person.name}</h3>
+        {!done ? (
+          <>
+            <label>{t("p_email")}</label>
+            <input type="text" inputMode="email" value={email}
+                   onChange={e => setEmail(e.target.value)} autoFocus />
+            <label>{t("p_acct_pw")}</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="text" value={pw} onChange={e => setPw(e.target.value)}
+                     style={{ fontFamily: "ui-monospace, Consolas, monospace", fontWeight: 700 }} />
+              <button className="mini-btn" onClick={() => setPw(genPassword())}>↻</button>
+            </div>
+            <div className="fhint" style={{ marginTop: 10 }}>{t("p_acct_hint")}</div>
+            {err && <div className="err">{err}</div>}
+            <div className="btns">
+              <button className="btn-cancel" onClick={onClose} disabled={busy}>{t("cancel")}</button>
+              <button className="btn-save" onClick={create}
+                      disabled={busy || !email.trim() || pw.length < 8}>
+                {busy ? "⏳" : t("p_acct_btn")}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="fhint" style={{ background: "#e6f4ea", color: "#1d5a33" }}>{t("p_acct_done")}</div>
+            <label>{t("p_email")}</label>
+            <input type="text" value={email} readOnly />
+            <label>{t("p_acct_pw")}</label>
+            <input type="text" value={pw} readOnly
+                   style={{ fontFamily: "ui-monospace, Consolas, monospace", fontWeight: 700, fontSize: 16 }} />
+            <div className="btns">
+              <button className="btn-save" onClick={onClose}>{t("close")}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
