@@ -236,6 +236,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   pz_client:        { hu: "Ügyfél", ro: "Client" },
   pz_desc:          { hu: "Megnevezés", ro: "Denumire" },
   pz_err_amount:    { hu: "Add meg az összeget.", ro: "Introdu suma." },
+  pz_err_float:     { hu: "Írd be a váltópénzt (reggel és este is).", ro: "Introdu banii de schimb (dimineața și seara)." },
   pz_err_vehicle:   { hu: "Ennél a kategóriánál kötelező a járművet kiválasztani.", ro: "La această categorie mașina este obligatorie." },
   pz_err_client:    { hu: "Ennél a kategóriánál kötelező az ügyfél megadása.", ro: "La această categorie clientul este obligatoriu." },
   pz_err_desc:      { hu: "Ennél a kategóriánál kötelező a megnevezés.", ro: "La această categorie denumirea este obligatorie." },

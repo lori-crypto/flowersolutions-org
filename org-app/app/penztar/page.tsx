@@ -477,8 +477,8 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
     for (const m of unit.monetar) o[String(m.denom)] = String(m.qty);
     return o;
   });
-  const [floatM, setFloatM] = useState(d?.float_morning != null ? String(d.float_morning) : "100");
-  const [floatE, setFloatE] = useState(d?.float_evening != null ? String(d.float_evening) : "100");
+  const [floatM, setFloatM] = useState(d?.float_morning != null ? String(d.float_morning) : "");
+  const [floatE, setFloatE] = useState(d?.float_evening != null ? String(d.float_evening) : "");
   const [zCash, setZCash] = useState(d?.z_cash != null ? String(d.z_cash) : "");
   const [zCard, setZCard] = useState(d?.z_card != null ? String(d.z_card) : "");
   const [pos, setPos] = useState(d?.pos_settlement != null ? String(d.pos_settlement) : "");
@@ -574,6 +574,9 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
   }
 
   async function save(closeToo: boolean) {
+    if (closeToo && unit.kind === "bolt" && (!floatM.trim() || !floatE.trim())) {
+      setErr(t("pz_err_float")); return;
+    }
     setBusy(true); setErr(""); setMsg("");
     try {
       await withAuthRetry(() => cashSaveDay(unit.id, payload(), editDay));
@@ -661,12 +664,12 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
             <label className="pz-field" style={{ flex: 1 }}>
               <span>{t("pz_float_morning")}</span>
               <input type="text" inputMode="decimal" value={floatM} disabled={locked}
-                     onChange={e => setFloatM(e.target.value)} />
+                     placeholder="0,00" onChange={e => setFloatM(e.target.value)} />
             </label>
             <label className="pz-field" style={{ flex: 1 }}>
               <span>{t("pz_float_evening")}</span>
               <input type="text" inputMode="decimal" value={floatE} disabled={locked}
-                     onChange={e => setFloatE(e.target.value)} />
+                     placeholder="0,00" onChange={e => setFloatE(e.target.value)} />
             </label>
           </div>
         </div>
