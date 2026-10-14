@@ -144,7 +144,7 @@ export default function PenztarPage() {
           ) : tab === "naplo" && isHr ? (
             <NaploTab meta={meta} units={ctx.units} />
           ) : tab === "havi" && isHr ? (
-            <HaviTab units={ctx.units} />
+            <HaviTab units={ctx.units} meta={meta} />
           ) : tab === "ellenorzes" && isHr ? (
             <EllenorzesTab meta={meta} units={ctx.units} />
           ) : tab === "kategoriak" && isHr ? (
@@ -1481,8 +1481,18 @@ function CategoryModal({ cat, quicklabels, onClose, onSaved }: {
 }
 
 /* ══════════ HAVI NÉZET (a régi táblázat mintájára) ══════════ */
-function HaviTab({ units }: { units: CashUnit[] }) {
+function HaviTab({ units, meta }: {
+  units: CashUnit[];
+  meta: { categories: CashCategory[]; vehicles: CashVehicle[]; quicklabels: CashQuicklabel[] };
+}) {
   const { t, pick } = useI18n();
+  // költség kategóriája és járműve a listákhoz (havi összesítő + napi felugró)
+  const expTags = (e: { category_id?: string | null; vehicle_id?: string | null; client_name?: string | null }) => {
+    const cat = e.category_id ? meta.categories.find(c => c.id === e.category_id) : null;
+    const veh = e.vehicle_id ? meta.vehicles.find(v => v.id === e.vehicle_id) : null;
+    return [cat ? pick(cat.name_hu, cat.name_ro ?? cat.name_hu) : null, veh?.plate, e.client_name]
+      .filter(Boolean) as string[];
+  };
   const now = new Date();
   const [ym, setYm] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
   const [days, setDays] = useState<OverviewDay[] | null>(null);
@@ -1775,7 +1785,7 @@ function HaviTab({ units }: { units: CashUnit[] }) {
               <b style={{ width: 44 }}>{e.day.slice(8)}.</b>
               <span style={{ flex: 1 }}>
                 {e.description || (e.kind === "letet" ? t("pz_k_letet") : e.kind)}
-                {e.client_name ? ` · ${e.client_name}` : ""}
+                {expTags(e).length ? ` · ${expTags(e).join(" · ")}` : ""}
               </span>
               <b style={{ fontVariantNumeric: "tabular-nums", color: e.kind === "koltseg" ? "#b3431f" : "#33528a" }}>
                 {fmt(Number(e.amount))}
@@ -1802,7 +1812,7 @@ function HaviTab({ units }: { units: CashUnit[] }) {
                       </div>
                       <div className="muted" style={{ fontSize: 12 }}>
                         {[un ? pick(un.name_hu, un.name_ro ?? un.name_hu) : t("pz_quick_title"),
-                          e.client_name].filter(Boolean).join(" · ")}
+                          ...expTags(e)].join(" · ")}
                       </div>
                     </div>
                     <b style={{ fontVariantNumeric: "tabular-nums",
