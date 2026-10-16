@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase, withAuthRetry } from "@/lib/supabaseClient";
+import { supabase, withAuthRetry, signOutAndGo } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { TopNav } from "@/lib/TopNav";
 import { LeaveBoard, BoardMember, setMembership } from "@/lib/leave";
@@ -122,7 +122,7 @@ export default function KollegakPage() {
           <option value="hu">HU — magyar</option>
           <option value="ro">RO — română</option>
         </select>
-        <button className="lang-btn" onClick={() => supabase.auth.signOut()}>{t("sign_out")}</button>
+        <button className="lang-btn" onClick={() => signOutAndGo()}>{t("sign_out")}</button>
       </header>
 
       {!isHr ? (

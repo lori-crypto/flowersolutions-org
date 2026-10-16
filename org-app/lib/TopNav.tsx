@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "./supabaseClient";
+import { supabase, signOutAndGo } from "./supabaseClient";
 import { useI18n } from "./i18n";
 
 // A bejelentkezett személy SAJÁT jogosultságai
@@ -45,7 +45,7 @@ export function NoAccessScreen({ active }: {
           <option value="hu">HU — magyar</option>
           <option value="ro">RO — română</option>
         </select>
-        <button className="lang-btn" onClick={() => supabase.auth.signOut()}>{t("sign_out")}</button>
+        <button className="lang-btn" onClick={() => signOutAndGo()}>{t("sign_out")}</button>
       </header>
       <div className="center-msg">{t("no_access")}</div>
     </>

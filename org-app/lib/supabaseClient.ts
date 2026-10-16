@@ -40,3 +40,21 @@ export async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
     throw e;
   }
 }
+
+/** Kijelentkezés: lezárja a munkamenetet, és MINDIG a belépő oldalra visz.
+ *  Ha a szerver nem válaszol vagy a token már érvénytelen, helyben törli a
+ *  munkamenetet — a gomb így sosem „ragad be". */
+export async function signOutAndGo(): Promise<void> {
+  const timeout = new Promise<void>(res => setTimeout(res, 2500));
+  try { await Promise.race([supabase.auth.signOut().then(() => undefined), timeout]); } catch { /* lásd lent */ }
+  try { await supabase.auth.signOut({ scope: "local" }); } catch { /* helyi törlés mindig */ }
+  try {
+    for (const s of [localStorage, sessionStorage]) {
+      for (let i = s.length - 1; i >= 0; i--) {
+        const k = s.key(i);
+        if (k && k.startsWith("sb-")) s.removeItem(k);
+      }
+    }
+  } catch { /* privát mód */ }
+  if (typeof window !== "undefined") window.location.replace("/login");
+}

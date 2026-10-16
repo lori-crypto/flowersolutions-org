@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase, withAuthRetry } from "@/lib/supabaseClient";
+import { supabase, withAuthRetry, signOutAndGo } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { TopNav, fetchMyCaps, capHas, routeForCaps, NoAccessScreen } from "@/lib/TopNav";
 import {
@@ -76,7 +76,7 @@ export default function TablaPage() {
     };
   }, [reload]);
 
-  async function signOut() { await supabase.auth.signOut(); }
+  async function signOut() { await signOutAndGo(); }
 
   // ── űrlap-nyitók ────────────────────────────────────────────
   function openPostForm(post: Post | null, anchor: Partial<Post>, title: string, allowLeadToggle: boolean) {
