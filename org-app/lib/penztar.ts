@@ -23,6 +23,7 @@ export type CashDay = {
   pos_settlement: number | null; nexus_revenue: number | null;
   cash_diff: number | null; card_diff: number | null;
   expl_cash: string | null; expl_card: string | null; review_note: string | null;
+  updated_at?: string | null;   // verzió a felülírás-védelemhez (sql/35)
 };
 export type CashExpense = {
   id: string; amount: number; category_id: string | null;
@@ -62,13 +63,25 @@ export type DayPayload = {
   pending: { amount: number; note: string | null }[];
 };
 
-export async function cashSaveDay(unitId: string, payload: DayPayload, day?: string | null): Promise<string> {
+/** Napi zárás mentése. `expected` = a kliens által utoljára látott verzió
+ *  (cash_days.updated_at); ha közben más mentett, a szerver 'STALE:' hibát ad.
+ *  Visszaadja az új verziót. Ha az adatbázisban még a régi (3 paraméteres)
+ *  függvény fut, visszaesik arra — így a kiadás sorrendje nem számít. */
+export async function cashSaveDay(unitId: string, payload: DayPayload, day?: string | null,
+                                  expected?: string | null): Promise<{ id: string; updated_at: string | null }> {
   const { data, error } = await supabase.rpc("app_cash_save_day", {
-    p_unit: unitId, p_payload: payload, p_day: day || null,
+    p_unit: unitId, p_payload: payload, p_day: day || null, p_expected: expected || null,
   });
+  if (error && /p_expected|PGRST202|Could not find the function/i.test(error.message)) {
+    const r = await supabase.rpc("app_cash_save_day", { p_unit: unitId, p_payload: payload, p_day: day || null });
+    fail(r.error);
+    return { id: String(r.data), updated_at: null };
+  }
   fail(error);
-  return data as string;
+  const d = data as { id?: string; updated_at?: string } | string;
+  return typeof d === "string" ? { id: d, updated_at: null } : { id: d.id ?? "", updated_at: d.updated_at ?? null };
 }
+export const isStaleError = (e: unknown) => /STALE:/.test((e as Error)?.message ?? "");
 
 export async function cashCloseDay(unitId: string, day?: string | null): Promise<{ cash_diff: number; card_diff: number | null }> {
   const { data, error } = await supabase.rpc("app_cash_close_day", { p_unit: unitId, p_day: day || null });

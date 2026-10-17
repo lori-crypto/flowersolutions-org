@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { TopNav } from "@/lib/TopNav";
 import {
   CashUnit, CashCategory, CashVehicle, CashQuicklabel, DayPayload, LedgerEntry, OverviewDay,
-  cashContext, cashSaveDay, cashCloseDay, cashMeta, DENOMS,
+  cashContext, cashSaveDay, cashCloseDay, cashMeta, DENOMS, isStaleError,
   cashBalance, cashLedger, cashQuickAdd, uploadReceipt, receiptUrl,
   cashOverview, cashMonetarOf, cashReview, CashExpense,
   cashClients, cashPendingResolve, PendingItem,
@@ -573,27 +573,115 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
     catch (e) { alert((e as Error).message); }
   }
 
-  // Automatikus piszkozatmentés: a beírt adatok akkor is rögzülnek,
-  // ha a kolléga elfelejti lezárni a napot. Csendes — hiba esetén a
-  // kézi mentés/zárás úgyis jelez.
+  // ── Verzió (felülírás-védelem): a szerver által utoljára látott updated_at.
+  // A mentés ezt küldi el; ha közben más mentett, STALE hibát kapunk.
+  const verRef = useRef<string | null>(d?.updated_at ?? null);
+
+  // ── Helyi piszkozat: minden beírás azonnal a böngészőbe is kerül, hogy
+  // lejárt munkamenet / frissítés / ütközés esetén se vesszen el semmi.
+  const dayKey = editDay ?? today;
+  const draftKey = `fsorg-cashdraft:${unit.id}:${dayKey}`;
+  // Összehasonlításhoz számértékekre hozott alak (a "1234,5" és az "1234.5" ugyanaz)
+  const canon = (p: DayPayload) => JSON.stringify({
+    fm: num(p.float_morning ?? ""), fe: num(p.float_evening ?? ""), zc: num(p.z_cash ?? ""),
+    zk: num(p.z_card ?? ""), pos: num(p.pos_settlement ?? ""), nx: num(p.nexus_revenue ?? ""),
+    ec: (p.expl_cash ?? "").trim(), ek: (p.expl_card ?? "").trim(),
+    mon: (p.monetar ?? []).filter(m => m.qty > 0), exp: p.expenses ?? [], pen: p.pending ?? [],
+  });
+  const readDraft = (): { at: string; payload: DayPayload } | null => {
+    try { const raw = localStorage.getItem(draftKey); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  };
+  const clearDraft = () => { try { localStorage.removeItem(draftKey); } catch { /* privát mód */ } };
+  // Piszkozat / szerver-adat betöltése az űrlap mezőibe
+  const applyPayload = (p: DayPayload) => {
+    setFloatM(p.float_morning ?? ""); setFloatE(p.float_evening ?? "");
+    setZCash(p.z_cash ?? ""); setZCard(p.z_card ?? ""); setPos(p.pos_settlement ?? "");
+    if (unit.nexus_today == null) setNexusRev(p.nexus_revenue ?? "");
+    setExplCash(p.expl_cash ?? ""); setExplCard(p.expl_card ?? "");
+    const q: Record<string, string> = {};
+    for (const m of p.monetar ?? []) if (m.qty > 0) q[String(m.denom)] = String(m.qty);
+    setQty(q);
+    setExpenses((p.expenses ?? []).map(e => ({
+      amount: String(e.amount ?? ""), category_id: e.category_id ?? "", vehicle_id: e.vehicle_id ?? "",
+      client_name: e.client_name ?? "", description: e.description ?? "",
+    })));
+    setPending((p.pending ?? []).map(x => ({ amount: String(x.amount ?? ""), note: x.note ?? "" })));
+  };
+  const [draftOffer, setDraftOffer] = useState<{ at: string; payload: DayPayload } | null>(() => {
+    if (locked) return null;
+    const dr = readDraft();
+    return dr && canon(dr.payload) !== canon(payload()) ? dr : null;
+  });
+  const [conflict, setConflict] = useState(false);
+  useEffect(() => {
+    // 7 napnál régebbi piszkozatok takarítása
+    try {
+      const cutoff = Date.now() - 7 * 86400_000;
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (!k?.startsWith("fsorg-cashdraft:")) continue;
+        const at = Date.parse(JSON.parse(localStorage.getItem(k) ?? "{}").at ?? "");
+        if (!at || at < cutoff) localStorage.removeItem(k);
+      }
+    } catch { /* privát mód */ }
+  }, []);
+
+  // Automatikus piszkozatmentés a szerverre: a beírt adatok akkor is
+  // rögzülnek, ha a kolléga elfelejti lezárni a napot. Hiba esetén piros
+  // jelzés + újrapróbálás; ütközésnél a friss szerver-adat töltődik be.
   const [autoAt, setAutoAt] = useState("");
   const [autoErr, setAutoErr] = useState(false);   // sikertelen automatikus mentés → piros jelzés
   const [autoTick, setAutoTick] = useState(0);     // újrapróbálás számláló
   const autoKey = JSON.stringify(payload());
   const autoRef = useRef({ last: autoKey, saving: false, locked });
   autoRef.current.locked = locked;
+  const dirty = !locked && autoKey !== autoRef.current.last;
+
+  // Ütközés: más mentett közben → a saját beírás piszkozatban marad, a friss adat betöltődik
+  const handleStale = async () => {
+    try { localStorage.setItem(draftKey, JSON.stringify({ at: new Date().toISOString(), payload: payload() })); } catch { /* */ }
+    try {
+      const det = await withAuthRetry(() => cashDayDetail(unit.id, dayKey));
+      const dd = det.day;
+      const serverPayload: DayPayload = {
+        float_morning: dd?.float_morning != null ? String(dd.float_morning) : "",
+        float_evening: dd?.float_evening != null ? String(dd.float_evening) : "",
+        z_cash: dd?.z_cash != null ? String(dd.z_cash) : "",
+        z_card: dd?.z_card != null ? String(dd.z_card) : "",
+        pos_settlement: dd?.pos_settlement != null ? String(dd.pos_settlement) : "",
+        nexus_revenue: dd?.nexus_revenue != null ? String(dd.nexus_revenue) : "",
+        expl_cash: dd?.expl_cash ?? "", expl_card: dd?.expl_card ?? "",
+        monetar: det.monetar, expenses: det.expenses.map(e => ({
+          amount: e.amount, category_id: e.category_id, vehicle_id: e.vehicle_id,
+          client_name: e.client_name, description: e.description })),
+        pending: det.pending.map(p => ({ amount: p.amount, note: p.note })),
+      };
+      verRef.current = dd?.updated_at ?? null;
+      applyPayload(serverPayload);
+      autoRef.current.last = JSON.stringify(serverPayload);
+      const dr = readDraft();
+      setDraftOffer(dr && canon(dr.payload) !== canon(serverPayload) ? dr : null);
+      setConflict(true);
+      if (dd && (dd.status === "lezart" || dd.status === "elfogadva")) await onChanged();
+    } catch (e) { setErr((e as Error).message); }
+  };
+
   useEffect(() => {
     if (locked || autoKey === autoRef.current.last) return;
+    // helyi piszkozat azonnal
+    try { localStorage.setItem(draftKey, JSON.stringify({ at: new Date().toISOString(), payload: payload() })); } catch { /* */ }
     const h = setTimeout(async () => {
       if (autoRef.current.locked || autoRef.current.saving) return;
       autoRef.current.saving = true;
       try {
-        await withAuthRetry(() => cashSaveDay(unit.id, payload(), editDay));
+        const r = await withAuthRetry(() => cashSaveDay(unit.id, payload(), editDay, verRef.current));
+        if (r.updated_at) verRef.current = r.updated_at;
         autoRef.current.last = autoKey;
         setAutoAt(new Date().toTimeString().slice(0, 5));
         setAutoErr(false);
-      } catch {
-        // nem csendes: piros jelzés a fejlécben, és 10 mp múlva újrapróbáljuk
+      } catch (e) {
+        if (isStaleError(e)) { autoRef.current.saving = false; await handleStale(); return; }
+        // nem csendes: piros jelzés, és 10 mp múlva újrapróbáljuk
         setAutoErr(true);
         setTimeout(() => setAutoTick(n => n + 1), 10_000);
       }
@@ -605,12 +693,11 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
 
   // Mentetlen adat esetén a böngésző kérdezzen rá az oldal bezárására / frissítésére.
   useEffect(() => {
-    const dirty = !locked && autoKey !== autoRef.current.last;
     if (!dirty) return;
     const onLeave = (e: BeforeUnloadEvent) => { e.preventDefault(); };
     window.addEventListener("beforeunload", onLeave);
     return () => window.removeEventListener("beforeunload", onLeave);
-  }, [autoKey, locked]);
+  }, [dirty]);
 
   async function save(closeToo: boolean) {
     if (closeToo && unit.kind === "bolt" && (!floatM.trim() || !floatE.trim())) {
@@ -618,16 +705,35 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
     }
     setBusy(true); setErr(""); setMsg("");
     try {
-      autoRef.current.last = JSON.stringify(payload());
-      await withAuthRetry(() => cashSaveDay(unit.id, payload(), editDay));
+      const key = JSON.stringify(payload());
+      const r = await withAuthRetry(() => cashSaveDay(unit.id, payload(), editDay, verRef.current));
+      if (r.updated_at) verRef.current = r.updated_at;
+      autoRef.current.last = key;
+      setAutoErr(false);
       if (closeToo) {
         await withAuthRetry(() => cashCloseDay(unit.id, editDay));
+        clearDraft();
       }
       setMsg(closeToo ? t("pz_closed_ok") : t("pz_saved"));
       await onChanged();
-    } catch (e) { setErr((e as Error).message); }
+    } catch (e) {
+      if (isStaleError(e)) { setBusy(false); await handleStale(); return; }
+      setErr((e as Error).message);
+    }
     setBusy(false);
   }
+
+  // Piszkozat visszatöltése a böngészőből (lejárt munkamenet / frissítés / ütközés után)
+  const restoreDraft = () => {
+    if (!draftOffer) return;
+    applyPayload(draftOffer.payload);
+    setDraftOffer(null); setConflict(false);
+    setMsg(t("pz_draft_restored"));
+  };
+  const draftTime = (iso: string) => {
+    const dt = new Date(iso);
+    return `${dt.getMonth() + 1}.${dt.getDate()}. ${dt.toTimeString().slice(0, 5)}`;
+  };
 
   const diffChip = (v: number | null) => {
     if (v == null) return null;
@@ -671,6 +777,22 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
 
       {d?.status === "visszakuldve" && d.review_note && (
         <div className="leave-err">{t("pz_review_note")}: {d.review_note}</div>
+      )}
+
+      {conflict && !locked && (
+        <div className="leave-err" style={{ background: "#fdf3e7", color: "#8a5a14", borderColor: "#eccf9f" }}>
+          {t("pz_conflict")}
+        </div>
+      )}
+      {draftOffer && !locked && (
+        <div className="stat-card" style={{ borderColor: "#eccf9f", background: "#fdf8ee",
+                                            display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <b style={{ fontSize: 13.5, color: "#8a5a14", flex: 1, minWidth: 200 }}>
+            {t("pz_draft_found")} ({draftTime(draftOffer.at)})
+          </b>
+          <button className="mini-btn" onClick={restoreDraft}>↩ {t("pz_draft_restore")}</button>
+          <button className="mini-btn" onClick={() => { clearDraft(); setDraftOffer(null); }}>{t("pz_draft_discard")}</button>
+        </div>
       )}
 
       {unit.kind === "lerakat" && (
@@ -941,6 +1063,14 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
       {err && <div className="leave-err">{err}</div>}
       {msg && <div className="fhint" style={{ background: "#e6f2ea", color: "#1d5a33" }}>{msg}</div>}
 
+      {!locked && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600,
+                      color: autoErr ? "#b3431f" : dirty ? "#8a5a14" : "#1d5a33" }}>
+          {autoErr ? `⚠ ${t("pz_autosave_failed")}`
+            : dirty ? `… ${t("pz_unsaved")}`
+            : `✓ ${t("pz_saved_at")}${autoAt ? ` (${autoAt})` : ""}`}
+        </div>
+      )}
       {!locked && (
         <div style={{ display: "flex", gap: 10 }}>
           <button className="mini-btn" style={{ flex: 1, padding: 13, fontSize: 15 }}
