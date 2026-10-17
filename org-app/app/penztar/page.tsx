@@ -577,6 +577,8 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
   // ha a kolléga elfelejti lezárni a napot. Csendes — hiba esetén a
   // kézi mentés/zárás úgyis jelez.
   const [autoAt, setAutoAt] = useState("");
+  const [autoErr, setAutoErr] = useState(false);   // sikertelen automatikus mentés → piros jelzés
+  const [autoTick, setAutoTick] = useState(0);     // újrapróbálás számláló
   const autoKey = JSON.stringify(payload());
   const autoRef = useRef({ last: autoKey, saving: false, locked });
   autoRef.current.locked = locked;
@@ -589,11 +591,25 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
         await withAuthRetry(() => cashSaveDay(unit.id, payload(), editDay));
         autoRef.current.last = autoKey;
         setAutoAt(new Date().toTimeString().slice(0, 5));
-      } catch { /* csendes */ }
+        setAutoErr(false);
+      } catch {
+        // nem csendes: piros jelzés a fejlécben, és 10 mp múlva újrapróbáljuk
+        setAutoErr(true);
+        setTimeout(() => setAutoTick(n => n + 1), 10_000);
+      }
       autoRef.current.saving = false;
     }, 2500);
     return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoKey, locked, autoTick]);
+
+  // Mentetlen adat esetén a böngésző kérdezzen rá az oldal bezárására / frissítésére.
+  useEffect(() => {
+    const dirty = !locked && autoKey !== autoRef.current.last;
+    if (!dirty) return;
+    const onLeave = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
   }, [autoKey, locked]);
 
   async function save(closeToo: boolean) {
@@ -629,7 +645,10 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
         <b style={{ fontSize: 15 }}>{pick(unit.name_hu, unit.name_ro ?? unit.name_hu)}</b>
         <span className="muted">{today}</span>
         <span className="sp" style={{ flex: 1 }} />
-        {!locked && autoAt && (
+        {!locked && autoErr && (
+          <span className="pct-tag neg" style={{ fontSize: 11.5 }}>⚠ {t("pz_autosave_failed")}</span>
+        )}
+        {!locked && !autoErr && autoAt && (
           <span className="muted" style={{ fontSize: 11.5 }}>✓ {t("pz_autosaved")} {autoAt}</span>
         )}
         {locked

@@ -227,6 +227,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   pz_save:          { hu: "Mentés", ro: "Salvează" },
   pz_saved:         { hu: "Elmentve.", ro: "Salvat." },
   pz_autosaved:     { hu: "automatikusan mentve", ro: "salvat automat" },
+  pz_autosave_failed: { hu: "NEM SIKERÜLT MENTENI — újrapróbálom, ne zárd be az oldalt", ro: "SALVAREA A EȘUAT — reîncerc, nu închide pagina" },
   pz_close_day:     { hu: "Nap lezárása", ro: "Închide ziua" },
   pz_close_confirm: { hu: "Biztosan lezárod a napot? Lezárás után már nem módosítható.", ro: "Sigur închizi ziua? După închidere nu se mai poate modifica." },
   pz_closed_ok:     { hu: "A nap lezárva. Köszönjük!", ro: "Ziua a fost închisă. Mulțumim!" },

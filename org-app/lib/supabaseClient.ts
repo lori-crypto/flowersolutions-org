@@ -29,13 +29,16 @@ export const supabase = createClient(
   { auth: { persistSession: true, autoRefreshToken: true, storage: authStorage } }
 );
 
-/** Lejárt token (JWT expired) esetén megújítja a munkamenetet és egyszer újrapróbálja. */
+/** Lejárt token (JWT expired) esetén megújítja a munkamenetet és egyszer újrapróbálja.
+ *  Ha a megújítás sem megy (a bejelentkezés végleg lejárt), a belépő oldalra visz,
+ *  hogy a felhasználó ne gépeljen tovább egy olyan oldalon, ahol semmi nem mentődik. */
 export async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
   try { return await fn(); }
   catch (e) {
-    if (/jwt|token|expired/i.test((e as Error)?.message ?? "")) {
-      const { error } = await supabase.auth.refreshSession();
-      if (!error) return await fn();
+    if (/jwt|token|expired|not authenticated|session/i.test((e as Error)?.message ?? "")) {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (!error && data.session) return await fn();
+      await signOutAndGo();
     }
     throw e;
   }
@@ -44,7 +47,10 @@ export async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
 /** Kijelentkezés: lezárja a munkamenetet, és MINDIG a belépő oldalra visz.
  *  Ha a szerver nem válaszol vagy a token már érvénytelen, helyben törli a
  *  munkamenetet — a gomb így sosem „ragad be". */
+let signingOut = false;
 export async function signOutAndGo(): Promise<void> {
+  if (signingOut) return;           // a SIGNED_OUT esemény ne indítsa újra
+  signingOut = true;
   const timeout = new Promise<void>(res => setTimeout(res, 2500));
   try { await Promise.race([supabase.auth.signOut().then(() => undefined), timeout]); } catch { /* lásd lent */ }
   try { await supabase.auth.signOut({ scope: "local" }); } catch { /* helyi törlés mindig */ }

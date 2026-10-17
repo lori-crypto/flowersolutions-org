@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n";
 import GestureGuard from "@/components/GestureGuard";
+import SessionGuard from "@/components/SessionGuard";
 
 export const metadata: Metadata = {
   title: "FS Org — Flower Solutions",
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="hu">
       <body>
         <GestureGuard />
+        <SessionGuard />
         <I18nProvider>{children}</I18nProvider>
       </body>
     </html>
