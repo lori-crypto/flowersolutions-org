@@ -551,12 +551,21 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
   const cardDiff = useMemo(() =>
     zCard && pos ? Math.round((num(zCard) - num(pos)) * 100) / 100 : null, [zCard, pos]);
 
+  // A beírt szöveg számmá normalizálva a mentéshez: "1 596,45" → "1596.45".
+  // Az adatbázis vesszős tizedest nem fogad el, ezért a kolléga vesszővel
+  // beírt kártya-összege korábban "NEM SIKERÜLT MENTENI" hibát adott.
+  const ns = (s: string) => {
+    const t = (s || "").trim();
+    if (!t) return "";
+    const n = parseFloat(t.replace(/\s/g, "").replace(",", "."));
+    return Number.isFinite(n) ? String(n) : "";
+  };
   function payload(): DayPayload {
     return {
-      float_morning: unit.kind === "bolt" ? floatM : "",
-      float_evening: unit.kind === "bolt" ? floatE : "",
-      z_cash: zCash, z_card: zCard, pos_settlement: pos,
-      nexus_revenue: unit.nexus_today != null ? String(unit.nexus_today) : nexusRev,
+      float_morning: unit.kind === "bolt" ? ns(floatM) : "",
+      float_evening: unit.kind === "bolt" ? ns(floatE) : "",
+      z_cash: ns(zCash), z_card: ns(zCard), pos_settlement: ns(pos),
+      nexus_revenue: unit.nexus_today != null ? String(unit.nexus_today) : ns(nexusRev),
       expl_cash: explCash, expl_card: explCard,
       monetar: DENOMS.map(dn => ({ denom: dn, qty: parseInt(qty[String(dn)] || "0", 10) || 0 })),
       expenses: expenses.map(e => ({
