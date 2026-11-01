@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase, withAuthRetry, signOutAndGo } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { TopNav } from "@/lib/TopNav";
+import MonthExpenses from "./MonthExpenses";
 import {
   CashUnit, CashCategory, CashVehicle, CashQuicklabel, DayPayload, LedgerEntry, OverviewDay,
   cashContext, cashSaveDay, cashCloseDay, cashMeta, DENOMS, isStaleError,
@@ -1659,6 +1660,7 @@ function HaviTab({ units, meta }: {
   const [balStart, setBalStart] = useState<number | null>(null);
   const [balEnd, setBalEnd] = useState<number | null>(null);
   const [expDay, setExpDay] = useState<string | null>(null);
+  const [persons, setPersons] = useState<Map<string, string>>(new Map());
   const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
@@ -1669,7 +1671,7 @@ function HaviTab({ units, meta }: {
       const to = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
       const nextFirst = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
       const o = await withAuthRetry(() => cashOverview(from, to));
-      setDays(o.days); setExpenses(o.expenses); setPendings(o.pendings);
+      setDays(o.days); setExpenses(o.expenses); setPendings(o.pendings); setPersons(o.persons);
       setBalStart(await withAuthRetry(() => cashBalanceAt(from)));
       setBalEnd(await withAuthRetry(() => cashBalanceAt(nextFirst)));
     } catch (e) { setErr((e as Error).message); }
@@ -1758,10 +1760,6 @@ function HaviTab({ units, meta }: {
     + lerakats.reduce((s, u) => s + (colTotals[u.id + "c"] ?? 0), 0);
   const grandCard = bolts.reduce((s, u) => s + (colTotals[u.id + "k"] ?? 0), 0);
   const grand = grandCash + grandCard;
-
-  const monthExpenses = expenses
-    .filter(e => e.kind === "koltseg" || e.day_id === null)
-    .sort((a, b) => a.day.localeCompare(b.day));
 
   const td: React.CSSProperties = { padding: "5px 9px", textAlign: "right",
     fontVariantNumeric: "tabular-nums", borderTop: "1px solid #f0f3f1", whiteSpace: "nowrap" };
@@ -1934,24 +1932,7 @@ function HaviTab({ units, meta }: {
         </div>
       </div>
 
-      <div className="stat-card">
-        <b style={{ fontSize: 14 }}>{t("pz_havi_exp_list")}</b>
-        <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 8 }}>
-          {monthExpenses.length === 0 && <div className="muted" style={{ fontSize: 13 }}>{t("stat_no_data")}</div>}
-          {monthExpenses.map((e, i) => (
-            <div key={i} style={{ display: "flex", gap: 10, fontSize: 13, alignItems: "baseline" }}>
-              <b style={{ width: 44 }}>{e.day.slice(8)}.</b>
-              <span style={{ flex: 1 }}>
-                {e.description || (e.kind === "letet" ? t("pz_k_letet") : e.kind)}
-                {expTags(e).length ? ` · ${expTags(e).join(" · ")}` : ""}
-              </span>
-              <b style={{ fontVariantNumeric: "tabular-nums", color: e.kind === "koltseg" ? "#b3431f" : "#33528a" }}>
-                {fmt(Number(e.amount))}
-              </b>
-            </div>
-          ))}
-        </div>
-      </div>
+      <MonthExpenses expenses={expenses} units={units} meta={meta} persons={persons} ym={ym} />
 
       {expDay && (
         <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setExpDay(null); }}>
