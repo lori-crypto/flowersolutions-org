@@ -37,19 +37,44 @@ export async function GET(req: NextRequest) {
 
   // teljes napló, karcsúsított mezőkkel (az anluna szűrőt ez a nézet nem ismeri)
   const basic = "Basic " + Buffer.from(key + ":").toString("base64");
-  const resp = await fetch(`${host}/api/v3/read/incasari_plati`, {
-    method: "POST",
-    headers: { Authorization: basic, "Content-Type": "application/json" },
-    body: JSON.stringify({ campuri: "data_document, cont, suma, plata, validare, tip_document, den_coresp" }),
-    cache: "no-store",
-  });
-  const dj = await resp.json();
-  if (String(dj?.isError ?? 0) !== "0" && String(dj?.isError) !== "None") {
-    return NextResponse.json({ error: "NEXUS hiba: " + (dj?.message || "ismeretlen") }, { status: 502 });
+  const keysMode = req.nextUrl.searchParams.get("keys"); // ?keys=ÉÉÉÉ-HH-NN → nyers sorok minden mezővel (felderítés)
+  const read = async (campuri?: string) => {
+    const resp = await fetch(`${host}/api/v3/read/incasari_plati`, {
+      method: "POST",
+      headers: { Authorization: basic, "Content-Type": "application/json" },
+      body: JSON.stringify(campuri ? { campuri } : {}),
+      cache: "no-store",
+    });
+    const dj = await resp.json();
+    if (String(dj?.isError ?? 0) !== "0" && String(dj?.isError) !== "None") {
+      throw new Error(dj?.message || "ismeretlen");
+    }
+    let rows: Row[] = dj?.result ?? [];
+    if (typeof rows === "string") rows = JSON.parse(rows as unknown as string);
+    return Array.isArray(rows) ? rows : [];
+  };
+  // Az `anulare` (sztornózott) mezőt is kérjük — ha ez a nézet nem ismeri, a mező nélkül próbáljuk újra.
+  let rows: Row[];
+  try {
+    rows = await read(keysMode ? undefined : "data_document, cont, suma, plata, validare, anulare, tip_document, den_coresp");
+  } catch (e1) {
+    try {
+      rows = await read("data_document, cont, suma, plata, validare, tip_document, den_coresp");
+    } catch {
+      return NextResponse.json({ error: "NEXUS hiba: " + (e1 as Error).message }, { status: 502 });
+    }
   }
-  let rows: Row[] = dj?.result ?? [];
-  if (typeof rows === "string") rows = JSON.parse(rows as unknown as string);
-  if (!Array.isArray(rows)) rows = [];
+  // Érvénytelen sor: nem érvényesített VAGY sztornózott (anulare true/1).
+  const skip = (r: Row) => String(r["validare"]).toLowerCase() === "false"
+    || /^(true|1)$/i.test(String(r["anulare"] ?? "").trim());
+
+  if (keysMode) {
+    const cont = String(units[0].nexus_cont).trim();
+    const list = rows
+      .filter(r => String(r["data_document"] ?? "").slice(0, 10) === keysMode)
+      .filter(r => String(r["cont"] ?? "").replace(/\s/g, "").startsWith(cont));
+    return NextResponse.json({ ok: true, keys: Object.keys(rows[0] ?? {}), sorok: list });
+  }
 
   const bucharest = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Bucharest" });
   const from = new Date(bucharest + "T12:00:00");
@@ -63,7 +88,7 @@ export async function GET(req: NextRequest) {
     for (const r of rows) {
       const day = String(r["data_document"] ?? "").slice(0, 7);
       if (day !== conts) continue;
-      if (String(r["validare"]).toLowerCase() === "false") continue;
+      if (skip(r)) continue;
       const k = `${String(r["cont"] ?? "").replace(/\s/g, "")} | ${String(r["tip_document"] ?? "").trim()} | plata=${r["plata"]}`;
       const a = agg.get(k) ?? { n: 0, s: 0 };
       a.n += 1; a.s += num(r["suma"]); agg.set(k, a);
@@ -79,9 +104,9 @@ export async function GET(req: NextRequest) {
     const list = rows
       .filter(r => String(r["data_document"] ?? "").slice(0, 10) === detail)
       .filter(r => String(r["cont"] ?? "").replace(/\s/g, "").startsWith(cont))
-      .filter(r => String(r["validare"]).toLowerCase() !== "false")
       .map(r => ({ tip: r["tip_document"], plata: r["plata"], suma: num(r["suma"]),
-                   partner: String(r["den_coresp"] ?? "").trim() }));
+                   partner: String(r["den_coresp"] ?? "").trim(),
+                   validare: r["validare"], anulare: r["anulare"], kihagyva: skip(r) }));
     return NextResponse.json({ ok: true, detail, tetelek: list });
   }
 
@@ -93,7 +118,7 @@ export async function GET(req: NextRequest) {
       const day = String(r["data_document"] ?? "").slice(0, 10);
       if (day < fromIso || day > bucharest) continue;
       if (String(r["plata"]) === "1") continue; // kifizetés — nem bevétel
-      if (String(r["validare"]).toLowerCase() === "false") continue;
+      if (skip(r)) continue;                     // nem érvényesített / sztornózott nyugta
       const c = String(r["cont"] ?? "").replace(/\s/g, "");
       if (!c.startsWith(cont)) continue;
       byDay.set(day, (byDay.get(day) ?? 0) + num(r["suma"]));
