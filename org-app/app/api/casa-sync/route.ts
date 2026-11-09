@@ -70,9 +70,13 @@ export async function GET(req: NextRequest) {
 
   if (keysMode) {
     const cont = String(units[0].nexus_cont).trim();
-    const list = rows
-      .filter(r => String(r["data_document"] ?? "").slice(0, 10) === keysMode)
-      .filter(r => String(r["cont"] ?? "").replace(/\s/g, "").startsWith(cont));
+    // ?keys=ÉÉÉÉ-HH-NN → a nap sorai; ?keys=ÉÉÉÉ-HH-NN&find=szöveg → a szöveget bárhol tartalmazó
+    // sorok (minden nap, minden kassza) + a negatív összegű sorok — sztornó-felderítéshez
+    const find = req.nextUrl.searchParams.get("find");
+    const list = find
+      ? rows.filter(r => JSON.stringify(r).toLowerCase().includes(find.toLowerCase()) || num(r["suma"]) < 0)
+      : rows.filter(r => String(r["data_document"] ?? "").slice(0, 10) === keysMode)
+            .filter(r => String(r["cont"] ?? "").replace(/\s/g, "").startsWith(cont));
     return NextResponse.json({ ok: true, keys: Object.keys(rows[0] ?? {}), sorok: list });
   }
 
