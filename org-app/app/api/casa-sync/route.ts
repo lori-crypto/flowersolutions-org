@@ -64,8 +64,8 @@ export async function GET(req: NextRequest) {
     }
   }
   const keysMode = req.nextUrl.searchParams.get("keys"); // ?keys=ÉÉÉÉ-HH-NN → nyers sorok minden mezővel (felderítés)
-  const read = async (campuri?: string) => {
-    const resp = await fetch(`${host}/api/v3/read/incasari_plati`, {
+  const read = async (campuri?: string, view = "incasari_plati") => {
+    const resp = await fetch(`${host}/api/v3/read/${view}`, {
       method: "POST",
       headers: { Authorization: basic, "Content-Type": "application/json" },
       body: JSON.stringify(campuri ? { campuri } : {}),
@@ -82,17 +82,51 @@ export async function GET(req: NextRequest) {
   // Az `anulare` (sztornózott) mezőt is kérjük — ha ez a nézet nem ismeri, a mező nélkül próbáljuk újra.
   let rows: Row[];
   try {
-    rows = await read(keysMode ? undefined : "data_document, cont, suma, plata, validare, anulare, tip_document, den_coresp");
+    rows = await read(keysMode ? undefined : "id_document, data_document, cont, suma, plata, validare, anulare, tip_document, den_coresp, explicatii");
   } catch (e1) {
     try {
-      rows = await read("data_document, cont, suma, plata, validare, tip_document, den_coresp");
+      rows = await read("id_document, data_document, cont, suma, plata, validare, tip_document, den_coresp, explicatii");
     } catch {
       return NextResponse.json({ error: "NEXUS hiba: " + (e1 as Error).message }, { status: 502 });
     }
   }
-  // Érvénytelen sor: nem érvényesített VAGY sztornózott (anulare true/1).
+
+  // Annulált nyugta felismerése. A NEXUS az annulált chitanta-t NEM veszi ki az
+  // incasari_plati naplóból és jelzőt sem ad rá — viszont törli a számla-hozzárendelését
+  // az incasari_plati_linii nézetből (és a számla visszaáll "Neincasata"-ra).
+  // Szabály: Chitanta + bevétel (plata=0), amelynek nincs egyetlen linii-sora sem → annulált.
+  let allocated: Set<string> | null = null;
+  try {
+    const linii = await read("id_document, suma_platita", "incasari_plati_linii");
+    allocated = new Set(linii.map(l => String(l["id_document"] ?? "")));
+  } catch {
+    allocated = null; // ha nem elérhető, a régi (jelző nélküli) viselkedés marad
+  }
+  const unallocated = (r: Row) => allocated !== null
+    && String(r["tip_document"] ?? "").trim().toLowerCase() === "chitanta"
+    && String(r["plata"]) === "0"
+    && !allocated.has(String(r["id_document"] ?? ""));
+
+  // Érvénytelen sor: nem érvényesített VAGY sztornózott (anulare true/1) VAGY annulált nyugta.
   const skip = (r: Row) => String(r["validare"]).toLowerCase() === "false"
-    || /^(true|1)$/i.test(String(r["anulare"] ?? "").trim());
+    || /^(true|1)$/i.test(String(r["anulare"] ?? "").trim())
+    || unallocated(r);
+
+  // ?check=ÉÉÉÉ-HH → a hónap annuláltnak ítélt (hozzárendelés nélküli) nyugtái a lerakat kasszáján
+  const check = req.nextUrl.searchParams.get("check");
+  if (check) {
+    const cont = String(units[0].nexus_cont).trim();
+    const list = rows
+      .filter(r => String(r["data_document"] ?? "").slice(0, 7) === check)
+      .filter(r => String(r["cont"] ?? "").replace(/\s/g, "").startsWith(cont))
+      .filter(unallocated)
+      .map(r => ({ nap: String(r["data_document"] ?? "").slice(0, 10), id: r["id_document"], suma: num(r["suma"]),
+                   partner: String(r["den_coresp"] ?? "").trim(), magyarazat: String(r["explicatii"] ?? "").trim() }));
+    const total = rows.filter(r => String(r["data_document"] ?? "").slice(0, 7) === check
+      && String(r["cont"] ?? "").replace(/\s/g, "").startsWith(cont)
+      && String(r["tip_document"] ?? "").trim().toLowerCase() === "chitanta" && String(r["plata"]) === "0").length;
+    return NextResponse.json({ ok: true, honap: check, linii_elerheto: allocated !== null, nyugtak: total, annulalt: list });
+  }
 
   if (keysMode) {
     const cont = String(units[0].nexus_cont).trim();
@@ -136,7 +170,7 @@ export async function GET(req: NextRequest) {
       .filter(r => String(r["cont"] ?? "").replace(/\s/g, "").startsWith(cont))
       .map(r => ({ tip: r["tip_document"], plata: r["plata"], suma: num(r["suma"]),
                    partner: String(r["den_coresp"] ?? "").trim(),
-                   validare: r["validare"], anulare: r["anulare"], kihagyva: skip(r) }));
+                   validare: r["validare"], anulare: r["anulare"], hozzarendeles_nelkul: unallocated(r), kihagyva: skip(r) }));
     return NextResponse.json({ ok: true, detail, tetelek: list });
   }
 
@@ -144,13 +178,17 @@ export async function GET(req: NextRequest) {
   for (const u of units) {
     const cont = String(u.nexus_cont).trim();
     const byDay = new Map<string, number>();
+    const skipped: Row[] = [];
     for (const r of rows) {
       const day = String(r["data_document"] ?? "").slice(0, 10);
       if (day < fromIso || day > bucharest) continue;
       if (String(r["plata"]) === "1") continue; // kifizetés — nem bevétel
-      if (skip(r)) continue;                     // nem érvényesített / sztornózott nyugta
       const c = String(r["cont"] ?? "").replace(/\s/g, "");
       if (!c.startsWith(cont)) continue;
+      if (skip(r)) {                             // nem érvényesített / sztornózott / annulált nyugta
+        skipped.push({ nap: day, suma: num(r["suma"]), partner: String(r["den_coresp"] ?? "").trim() });
+        continue;
+      }
       byDay.set(day, (byDay.get(day) ?? 0) + num(r["suma"]));
     }
     for (const [day, amount] of byDay) {
@@ -160,7 +198,7 @@ export async function GET(req: NextRequest) {
       });
       if (up.error) return NextResponse.json({ error: up.error.message }, { status: 500 });
     }
-    report.push({ unit: u.code, napok: Object.fromEntries(byDay) });
+    report.push({ unit: u.code, napok: Object.fromEntries(byDay), kihagyott_nyugtak: skipped });
   }
   return NextResponse.json({ ok: true, sorok: rows.length, report });
 }
