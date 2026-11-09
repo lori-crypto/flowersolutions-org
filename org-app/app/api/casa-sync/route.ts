@@ -37,6 +37,32 @@ export async function GET(req: NextRequest) {
 
   // teljes napló, karcsúsított mezőkkel (az anluna szűrőt ez a nézet nem ismeri)
   const basic = "Basic " + Buffer.from(key + ":").toString("base64");
+
+  // ?probe=<nézet>&body={json}&find=szöveg → tetszőleges NEXUS read-nézet mezői és
+  // (a szövegre illő) első sorai — az annulálás-jelző felderítéséhez. Csak olvas.
+  const probe = req.nextUrl.searchParams.get("probe");
+  if (probe) {
+    let body: Record<string, unknown> = {};
+    try { body = JSON.parse(req.nextUrl.searchParams.get("body") || "{}"); } catch { /* üres */ }
+    const find = (req.nextUrl.searchParams.get("find") || "").toLowerCase();
+    try {
+      const resp = await fetch(`${host}/api/v3/read/${encodeURIComponent(probe)}`, {
+        method: "POST", headers: { Authorization: basic, "Content-Type": "application/json" },
+        body: JSON.stringify(body), cache: "no-store",
+      });
+      const text = await resp.text();
+      let dj: { isError?: unknown; message?: string; result?: unknown } = {};
+      try { dj = JSON.parse(text); } catch { return NextResponse.json({ ok: false, status: resp.status, raw: text.slice(0, 500) }); }
+      let rs: unknown = dj?.result ?? [];
+      if (typeof rs === "string") { try { rs = JSON.parse(rs); } catch { /* marad string */ } }
+      const arr = Array.isArray(rs) ? (rs as Row[]) : [];
+      const hit = find ? arr.filter(r => JSON.stringify(r).toLowerCase().includes(find)) : arr;
+      return NextResponse.json({ ok: true, status: resp.status, isError: dj?.isError, message: dj?.message,
+        n: arr.length, talalat: hit.length, keys: Object.keys(arr[0] ?? {}), sorok: hit.slice(0, 20) });
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: (e as Error).message });
+    }
+  }
   const keysMode = req.nextUrl.searchParams.get("keys"); // ?keys=ÉÉÉÉ-HH-NN → nyers sorok minden mezővel (felderítés)
   const read = async (campuri?: string) => {
     const resp = await fetch(`${host}/api/v3/read/incasari_plati`, {
