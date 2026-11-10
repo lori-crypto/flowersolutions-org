@@ -48,7 +48,10 @@ export default function LoginPage() {
   async function forgot() {
     if (!email) { setErr(t("email") + "?"); return; }
     setErr(""); setOk("");
-    await supabase.auth.resetPasswordForEmail(email);
+    // a linkről az új-jelszó oldalra jöjjön vissza (a Supabase Redirect URL listában engedélyezve kell legyen)
+    await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/login/uj-jelszo`,
+    });
     setOk(t("reset_sent"));
   }
 
