@@ -1136,7 +1136,22 @@ function ClosingForm({ unit, meta, today, editDay, canReopen, onChanged }: {
           }}>{t("pz_close_day")}</button>
         </div>
       )}
-      <button className="mini-btn" style={{ padding: 12, fontSize: 14.5 }} onClick={() => {
+      <button className="mini-btn" style={{ padding: 12, fontSize: 14.5, opacity: locked ? 1 : 0.55 }} onClick={() => {
+        // Nyomtatás csak lezárt és hiánytalanul kitöltött napról — a félkész lap ne menjen a borítékba.
+        if (!locked) { alert(t("pz_print_close_first")); return; }
+        const missing: string[] = [];
+        if (unit.kind === "bolt") {
+          if (!floatM.trim()) missing.push(t("pz_float") + " — " + t("pz_float_morning"));
+          if (!floatE.trim()) missing.push(t("pz_float") + " — " + t("pz_float_evening"));
+          if (!(counted > 0)) missing.push(t("pz_monetar"));
+          if (!zCash.trim()) missing.push(t("pz_z_cash"));
+          if (!zCard.trim()) missing.push(t("pz_z_card"));
+          if (!pos.trim()) missing.push(t("pz_pos"));
+        } else {
+          if (!(counted > 0) && pending.length === 0) missing.push(t("pz_monetar"));
+          if (effNexus == null) missing.push(t("pz_nexus_rev"));
+        }
+        if (missing.length) { alert([t("pz_print_missing"), ...missing.map(m => "• " + m)].join("\n")); return; }
         const pseudo = {
           id: d?.id ?? "", unit_id: unit.id, day: editDay ?? today,
           status: d?.status ?? "nyitott", closed_by: null,
@@ -1316,6 +1331,7 @@ function EllenorzesTab({ meta, units }: {
     : <span className="acct-tag">{t("pz_st_nyitott")}</span>;
 
   function doPrint(d: OverviewDay) {
+    if (d.status !== "lezart" && d.status !== "elfogadva") { alert(t("pz_print_close_first")); return; }
     const exps = expenses.filter(e => e.day_id === d.id);
     const pnds = pendings.filter(p => p.day_id === d.id || (p.unit_id === d.unit_id && p.day === d.day));
     printDay(d, monetar, exps, meta, persons, lang,

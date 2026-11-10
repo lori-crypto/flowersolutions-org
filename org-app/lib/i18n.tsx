@@ -281,6 +281,8 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   pz_desc:          { hu: "Megnevezés", ro: "Denumire" },
   pz_err_amount:    { hu: "Add meg az összeget.", ro: "Introdu suma." },
   pz_err_float:     { hu: "Írd be a váltópénzt (reggel és este is).", ro: "Introdu banii de schimb (dimineața și seara)." },
+  pz_print_close_first: { hu: "A lap csak lezárt napról nyomtatható. Előbb töltsd ki a kötelező mezőket és zárd le a napot.", ro: "Fișa se poate imprima doar după închiderea zilei. Completează mai întâi câmpurile obligatorii și închide ziua." },
+  pz_print_missing: { hu: "Nem nyomtatható — hiányzó adatok:", ro: "Nu se poate imprima — date lipsă:" },
   pz_err_vehicle:   { hu: "Ennél a kategóriánál kötelező a járművet kiválasztani.", ro: "La această categorie mașina este obligatorie." },
   pz_err_client:    { hu: "Ennél a kategóriánál kötelező az ügyfél megadása.", ro: "La această categorie clientul este obligatoriu." },
   pz_err_desc:      { hu: "Ennél a kategóriánál kötelező a megnevezés.", ro: "La această categorie denumirea este obligatorie." },
