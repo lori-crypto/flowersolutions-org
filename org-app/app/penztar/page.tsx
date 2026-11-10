@@ -84,14 +84,30 @@ export default function PenztarPage() {
     setEditing({ unit: pseudo, day });
   }, []);
 
-  async function openPast(u: CashUnit, day: string, status: string) {
+  async function openPast(u: CashUnit, day: string, status?: string) {
     try {
-      if (status === "lezart" || status === "elfogadva") {
+      let st = status;
+      if (st === undefined) {                       // ismeretlen állapot (dátumválasztóból) → megnézzük
+        const det = await withAuthRetry(() => cashDayDetail(u.id, day));
+        st = det.day?.status ?? "hianyzik";
+      }
+      if (st === "lezart" || st === "elfogadva") {
         await withAuthRetry(() => cashReopenDay(u.id, day));
       }
       await loadPast(u, day);
     } catch (e) { alert((e as Error).message); }
   }
+  // az utolsó 5 nap listája a mai napból visszafelé — a ki nem töltött napok is látszanak
+  const lastDays = (today: string, n: number): string[] => {
+    const out: string[] = [];
+    const d = new Date(today + "T12:00:00Z");
+    for (let i = 1; i <= n; i++) {
+      const x = new Date(d); x.setUTCDate(d.getUTCDate() - i);
+      out.push(x.toISOString().slice(0, 10));
+    }
+    return out;
+  };
+  const [anyDay, setAnyDay] = useState("");
 
   return (
     <>
@@ -180,11 +196,24 @@ export default function PenztarPage() {
                          today={ctx.today} canReopen={unit.kind === "lerakat" || isHr}
                          onChanged={reload} />
           )}
-          {!editing && unit && unit.kind === "lerakat" && unit.history.length > 0 && (
+          {!editing && unit && unit.kind === "lerakat" && (
             <div className="stat-card" style={{ marginTop: 14 }}>
               <b style={{ fontSize: 14 }}>{t("pz_history_title")}</b>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-                {unit.history.map(h => (
+                {lastDays(ctx.today, 5).map(day => {
+                  const h = unit.history.find(x => x.day === day);
+                  if (!h) return (
+                    <div key={day} className="pz-hist" style={{ borderColor: "#f0ddbb", background: "#fdf8ee" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <b>{day}</b>
+                        <div className="muted" style={{ fontSize: 12, color: "#9a6c10" }}>{t("pz_day_missing")}</div>
+                      </div>
+                      <button className="mini-btn" onClick={() => openPast(unit, day, "hianyzik")}>
+                        ✎ {t("pz_fill_day")}
+                      </button>
+                    </div>
+                  );
+                  return (
                   <div key={h.day} className="pz-hist">
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <b>{h.day}</b>
@@ -202,9 +231,26 @@ export default function PenztarPage() {
                       ✎ {t("pz_open_day")}
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="fhint" style={{ marginTop: 10 }}>{t("pz_history_note")}</div>
+            </div>
+          )}
+          {!editing && unit && isHr && (
+            <div className="stat-card" style={{ marginTop: 14, borderColor: "#cfdfd5" }}>
+              <b style={{ fontSize: 14 }}>{t("pz_any_day_title")}</b>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginTop: 10 }}>
+                <label className="pz-field" style={{ width: 170 }}>
+                  <span>{t("f_from")}</span>
+                  <input type="date" value={anyDay} max={ctx.today} onChange={e => setAnyDay(e.target.value)} />
+                </label>
+                <button className="mini-btn" disabled={!anyDay} style={{ padding: "10px 16px" }}
+                        onClick={() => { if (anyDay) openPast(unit, anyDay); }}>
+                  ✎ {t("pz_open_day")}
+                </button>
+              </div>
+              <div className="fhint" style={{ marginTop: 10 }}>{t("pz_any_day_hint")}</div>
             </div>
           )}
           </>)}
