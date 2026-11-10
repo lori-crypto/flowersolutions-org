@@ -16,6 +16,8 @@ export default function SessionGuard() {
   const pathname = usePathname();
   useEffect(() => {
     if (!pathname || pathname.startsWith("/login")) return;
+    // jelszó-visszaállító linkről érkezés: ezt a RecoveryRedirect kezeli, itt nem lépünk közbe
+    if (/type=recovery|error_code=otp_expired/.test(window.location.hash)) return;
     let stopped = false;
 
     const check = async () => {

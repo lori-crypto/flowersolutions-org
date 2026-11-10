@@ -3,6 +3,7 @@ import "./globals.css";
 import { I18nProvider } from "@/lib/i18n";
 import GestureGuard from "@/components/GestureGuard";
 import SessionGuard from "@/components/SessionGuard";
+import RecoveryRedirect from "@/components/RecoveryRedirect";
 
 export const metadata: Metadata = {
   title: "FS Org — Flower Solutions",
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <GestureGuard />
         <SessionGuard />
+        <RecoveryRedirect />
         <I18nProvider>{children}</I18nProvider>
       </body>
     </html>
