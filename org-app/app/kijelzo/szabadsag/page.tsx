@@ -26,7 +26,18 @@ type Data = {
 const REFRESH_MS = 60_000;
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+// A kijelzőt hajtó gép órája lehet UTC-re állítva (szerver) — a „ma” és az óra ezért mindig
+// romániai idő szerint számol, függetlenül a gép időzónájától.
+const TZ = "Europe/Bucharest";
+const tzFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+const tzParts = (d: Date) => {
+  const p = tzFmt.formatToParts(d);
+  const g = (t: string) => p.find(x => x.type === t)?.value ?? "";
+  return { day: `${g("year")}-${g("month")}-${g("day")}`, hm: `${g("hour")}:${g("minute")}` };
+};
+const hhmm = (d: Date) => tzParts(d).hm;
 
 const TXT = {
   hu: { title: "Szabadságos tábla", away: "Ma távol", nobody: "ma mindenki dolgozik", updated: "frissítve",
@@ -133,7 +144,7 @@ export default function KijelzoSzabadsag() {
   if (badKey) return <div className="kx kx-msg">{tx.nokey}</div>;
   if (!data || !board) return <div className="kx kx-msg">{tx.loading}</div>;
 
-  const today = iso(now);                      // a kijelző gépének órája (helyi idő)
+  const today = tzParts(now).day;              // romániai idő szerinti mai nap
   const year = data.year;
   const todays = byDay.get(today) ?? [];
   const usedTypes = data.types.filter(t => data.entries.some(e => e.board_id === board.id && e.type_code === t.code));
@@ -162,7 +173,7 @@ export default function KijelzoSzabadsag() {
               ))}
         </div>
         <div className="kx-clock">
-          <span className="kx-date">{now.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" })}</span>
+          <span className="kx-date">{now.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", timeZone: TZ })}</span>
           <b>{hhmm(now)}</b>
         </div>
       </header>
