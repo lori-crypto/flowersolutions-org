@@ -100,6 +100,7 @@ if command -v gsettings >/dev/null 2>&1; then
   gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
   gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
   gsettings set org.gnome.desktop.notifications show-banners false
+  gsettings set com.ubuntu.update-notifier no-show-notifications true
 fi
 # sima X alatt (Wayland alatt ez egyszeruen nem csinal semmit)
 if command -v xset >/dev/null 2>&1; then xset s off; xset -dpms; xset s noblank; fi
@@ -170,6 +171,8 @@ X-GNOME-Autostart-enabled=true
 Terminal=false
 DESKEOF
   echo ">> autostart beallitva: $AUTOSTART"
+  # a GNOME elso belepeskor "Udvozlunk" varazslot nyitna a tabla ele - jelezzuk, hogy mar megvolt
+  [ -f "$HOME/.config/gnome-initial-setup-done" ] || echo yes > "$HOME/.config/gnome-initial-setup-done"
   # automatikus bejelentkezes ellenorzese (enelkul ujrainditas utan a belepo kepernyo all a monitoron)
   AUTOLOGIN=0
   grep -Eqs "^\s*AutomaticLoginEnable\s*=\s*[Tt]rue" /etc/gdm3/custom.conf /etc/gdm/custom.conf 2>/dev/null && AUTOLOGIN=1
