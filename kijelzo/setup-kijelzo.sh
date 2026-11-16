@@ -91,14 +91,49 @@ for b in chromium-browser chromium google-chrome google-chrome-stable firefox fi
 done
 [ -z "\$BROWSER" ] && { echo "HIBA: nincs bongeszo telepitve"; exit 1; }
 
-# kepernyo-elalvas ki (X alatt; Wayland alatt ez egyszeruen nem csinal semmit)
+# kepernyo-elalvas es zarolas ki.
+# GNOME (Ubuntu asztal): enelkul par perc tetlenseg utan lekapcsolja a kimenetet ("nincs jel" a monitoron)
+if command -v gsettings >/dev/null 2>&1; then
+  gsettings set org.gnome.desktop.session idle-delay 0
+  gsettings set org.gnome.desktop.screensaver lock-enabled false
+  gsettings set org.gnome.desktop.screensaver idle-activation-enabled false
+  gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+  gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
+  gsettings set org.gnome.desktop.notifications show-banners false
+fi
+# sima X alatt (Wayland alatt ez egyszeruen nem csinal semmit)
 if command -v xset >/dev/null 2>&1; then xset s off; xset -dpms; xset s noblank; fi
 command -v unclutter >/dev/null 2>&1 && (unclutter -idle 1 &)
 
 API="\${URL%%/kijelzo/*}/api/kijelzo/szabadsag?\${URL#*\?}"
+probe() {  # valaszol-e a szerver (curl, ennek hijan wget; ha egyik sincs, nem varunk ra)
+  if command -v curl >/dev/null 2>&1; then curl -fsS -m 10 -o /dev/null "\$API"
+  elif command -v wget >/dev/null 2>&1; then wget -q -T 10 -O /dev/null "\$API"
+  else sleep 15; return 0; fi
+}
+
+# Firefox: elso inditasi es "osszeomlott" kerdesek kikapcsolasa
+mkdir -p "\$DIR/profil-ff"
+cat > "\$DIR/profil-ff/user.js" <<'UJS'
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("browser.aboutwelcome.enabled", false);
+user_pref("browser.preonboarding.enabled", false);
+user_pref("termsofuse.bypassNotification", true);
+user_pref("startup.homepage_welcome_url", "");
+user_pref("startup.homepage_welcome_url.additional", "");
+user_pref("browser.startup.homepage_override.mstone", "ignore");
+user_pref("datareporting.policy.dataSubmissionPolicyBypassNotification", true);
+user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("browser.sessionstore.max_resumed_crashes", 0);
+user_pref("browser.tabs.warnOnClose", false);
+user_pref("browser.translations.automaticallyPopup", false);
+user_pref("full-screen-api.warning.timeout", 0);
+UJS
+
 while true; do
   # megvarjuk, amig a szerver tenyleg valaszol - igy sosem hibaoldal indul
-  until curl -fsS -m 10 -o /dev/null "\$API"; do
+  until probe; do
     echo "\$(date '+%T') nincs kapcsolat, varok..."; sleep 10
   done
   case "\$BROWSER" in
@@ -143,15 +178,29 @@ DESKEOF
   if [ "$AUTOLOGIN" = 0 ]; then
     case "$DM" in
       gdm3|gdm) TODO="$TODO
-  * Automatikus bejelentkezes (GDM):  sudo nano /etc/gdm3/custom.conf   -> a [daemon] ala:
-        AutomaticLoginEnable=True
-        AutomaticLogin=$USER" ;;
+  * Automatikus bejelentkezes (GDM):
+        sudo sed -i 's/^#\?\s*AutomaticLoginEnable\s*=.*/AutomaticLoginEnable=true/; s/^#\?\s*AutomaticLogin\s*=.*/AutomaticLogin=$USER/' /etc/gdm3/custom.conf
+        grep -i automaticlogin /etc/gdm3/custom.conf     (ellenorzes: ket sor legyen, # nelkul;
+        ha nincs ilyen sor:  sudo nano /etc/gdm3/custom.conf  -> a [daemon] ala ird be a kettot)" ;;
       lightdm) TODO="$TODO
   * Automatikus bejelentkezes (LightDM):
         printf '[Seat:*]\nautologin-user=$USER\nautologin-user-timeout=0\n' | sudo tee /etc/lightdm/lightdm.conf.d/50-fs-kijelzo.conf" ;;
       *) TODO="$TODO
   * Allitsd be az automatikus bejelentkezest a(z) $USER felhasznalora (Beallitasok -> Felhasznalok)." ;;
     esac
+  fi
+  # ha a gep MAS felhasznaloval lep be automatikusan, a mi autostartunk nem indul el
+  AL_USER="$(grep -Ehs '^\s*AutomaticLogin\s*=' /etc/gdm3/custom.conf /etc/gdm/custom.conf 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '[:space:]')"
+  if [ "$AUTOLOGIN" = 1 ] && [ -n "$AL_USER" ] && [ "$AL_USER" != "$USER" ]; then
+    TODO="$TODO
+  * FIGYELEM: a gep most a(z) '$AL_USER' felhasznaloval lep be automatikusan, nem veled ($USER).
+    A kijelzo csak annak indul el, aki a kepernyon be van lepve. Atallitas erre a felhasznalora:
+        sudo sed -i 's/^\s*AutomaticLogin\s*=.*/AutomaticLogin=$USER/' /etc/gdm3/custom.conf"
+  fi
+  # ki van most belepve a gep sajat kepernyojen?
+  SEAT_USER="$(loginctl list-sessions --no-legend 2>/dev/null | awk '$4=="seat0"{print $3; exit}')"
+  if [ -n "$SEAT_USER" ] && [ "$SEAT_USER" != "$USER" ]; then
+    echo ">> MEGJEGYZES: a kepernyon most '$SEAT_USER' van belepve - a kijelzo ujrainditas (es $USER automatikus belepese) utan jelenik meg."
   fi
 else
   # --- B eset: nincs asztali kornyezet (szerver) -> minimal X a tty1-en ---
@@ -188,7 +237,7 @@ fi
 [ -z "$BROWSER" ] && TODO="$TODO
   * Bongeszo telepitese:
         sudo apt install -y chromium-browser   (ha ilyen csomag nincs: sudo apt install -y chromium  vagy  sudo snap install chromium)"
-command -v curl >/dev/null 2>&1 || TODO="$TODO
+command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || TODO="$TODO
   * sudo apt install -y curl"
 
 # ---- 4) osszefoglalo --------------------------------------------------
