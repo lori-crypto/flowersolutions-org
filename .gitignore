@@ -15,3 +15,7 @@ adatok/
 .DS_Store
 *.log
 .vercel
+
+# fali kijelző — a kész telepítő a kulcsot tartalmazza, az előnézet valós neveket
+kijelzo/*.KESZ.sh
+kijelzo/*.png

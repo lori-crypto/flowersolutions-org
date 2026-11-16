@@ -551,3 +551,70 @@ body.editing .hint{display:block}
   .cmp-toggles .serie-btn{width:100%; text-align:left; padding:7px 10px;
     font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 }
+
+/* ══════════ FALI KIJELZŐ (kioszk) — /kijelzo/* ══════════
+   Minden méret em-ben: 1em = 16px egy 1920×1080-as képernyőn, és a képernyővel együtt nő. */
+.kx{position:fixed; inset:0; display:flex; flex-direction:column; overflow:hidden; cursor:none;
+  font-size:min(1.4815vh, 0.8333vw); background:#eef1f5; color:#18212c; user-select:none}
+.kx-msg{align-items:center; justify-content:center; font-size:max(22px, 2.6vh); color:#5b6572; padding:2em; text-align:center}
+.kx-head{flex:0 0 4.4em; display:flex; align-items:center; gap:1.6em; padding:0 1.2em;
+  background:#2f7a4f; color:#fff}
+.kx-title{display:flex; align-items:baseline; gap:.7em; white-space:nowrap}
+.kx-title .kx-app{font-size:1.05em; opacity:.8; font-weight:600}
+.kx-title b{font-size:2em; font-weight:800; letter-spacing:.01em}
+.kx-title .kx-year{font-size:2em; font-weight:300; opacity:.9}
+.kx-dots{display:inline-flex; gap:.35em; margin-left:.4em; align-self:center}
+.kx-dots i{width:.55em; height:.55em; border-radius:50%; background:rgba(255,255,255,.35)}
+.kx-dots i.on{background:#fff}
+.kx-away{flex:1; min-width:0; display:flex; align-items:center; gap:.5em; overflow:hidden; white-space:nowrap}
+.kx-away-l{font-size:1.05em; opacity:.85; font-weight:600}
+.kx-away i{font-style:normal; font-size:1.25em; font-weight:800; color:#fff; padding:.12em .55em; border-radius:.4em;
+  box-shadow:0 0 0 .1em rgba(255,255,255,.85)}
+.kx-nobody{font-size:1.15em; opacity:.9; font-style:italic}
+.kx-clock{display:flex; align-items:baseline; gap:.8em; white-space:nowrap}
+.kx-clock .kx-date{font-size:1.3em; font-weight:600; opacity:.92; text-transform:capitalize}
+.kx-clock b{font-size:2.5em; font-weight:800; font-variant-numeric:tabular-nums}
+
+.kx-wall{flex:1; min-height:0; display:grid; grid-template-columns:repeat(12, minmax(0, 1fr));
+  margin:.45em .5em 0; background:#fff; border:1px solid #cfd6de; border-radius:.6em; overflow:hidden}
+.kx-col{display:grid; grid-template-rows:2.1em repeat(31, minmax(0, 1fr)); min-height:0; min-width:0;
+  border-left:1px solid #cfd6de}
+.kx-col:first-child{border-left:none}
+.kx-month{display:flex; align-items:center; justify-content:center; font-size:1.1em; font-weight:800;
+  text-transform:capitalize; background:#f3f5f8; border-bottom:1px solid #cfd6de}
+.kx-month.cur{background:#2f7a4f; color:#fff}
+.kx-cell{display:flex; align-items:center; gap:.25em; padding:0 .3em; min-height:0; min-width:0;
+  border-top:1px solid #edf0f3; overflow:hidden}
+.kx-cell.we{background:#e3e7ec}
+.kx-cell.hol{background:#d8eedf}
+.kx-cell.blk{background:#f3b6ad; box-shadow:inset .22em 0 0 #c0392b}
+.kx-cell.kx-empty{background:#f7f8fa; border-top-color:#f7f8fa}
+.kx-cell.today{background:#ffe680; box-shadow:inset 0 0 0 .16em #d99a00; position:relative; z-index:1}
+.kx-cell.past .kx-dn, .kx-cell.past .kx-tags, .kx-cell.past .kx-star{opacity:.45}
+.kx-dn{flex:0 0 1.35em; display:flex; flex-direction:column; align-items:center; line-height:1}
+.kx-dn b{font-size:.98em; font-weight:800; color:#3b4654}
+.kx-dn em{font-style:normal; font-size:.55em; font-weight:700; text-transform:uppercase; color:#7a8492; margin-top:.1em}
+.kx-cell.today .kx-dn b{color:#7a4a00}
+.kx-star{flex:0 0 auto; font-size:.8em; color:#2e7d32}
+.kx-tags{flex:1; min-width:0; display:flex; align-items:center; gap:.18em; overflow:hidden}
+.kx-tags i{flex:0 1 auto; min-width:0; font-style:normal; color:#fff; font-weight:800; font-size:.74em; line-height:1.45;
+  padding:0 .32em; border-radius:.3em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.kx-tags.two i{font-size:.66em; padding:0 .26em}
+.kx-cell.hol .kx-tags.two i{font-size:.62em}
+.kx-tags.many{flex-wrap:wrap; align-content:center; row-gap:.08em}
+.kx-tags.many i{font-size:.6em; line-height:1.35; padding:0 .28em}
+.kx-more{font-size:.62em; font-weight:800; color:#5b6572}
+
+.kx-foot{flex:0 0 2em; display:flex; align-items:center; justify-content:space-between; gap:2em; padding:0 1em;
+  font-size:.92em; color:#4a5563}
+.kx-legend{display:flex; align-items:center; gap:1.4em; white-space:nowrap; overflow:hidden}
+.kx-legend span{display:inline-flex; align-items:center; gap:.4em; font-weight:600}
+.kx-legend i{width:1em; height:1em; border-radius:.22em; display:inline-block}
+.kx-legend .sw-today{background:#ffe680; box-shadow:inset 0 0 0 .12em #d99a00}
+.kx-legend .sw-we{background:#cfd5dc}
+.kx-legend .sw-hol{background:#bfe3c9}
+.kx-legend .sw-blk{background:#f3b6ad; box-shadow:inset .2em 0 0 #c0392b}
+.kx-status{display:inline-flex; align-items:center; gap:.45em; font-weight:600; white-space:nowrap}
+.kx-status i{width:.7em; height:.7em; border-radius:50%; background:#2e9e56}
+.kx-status.off{color:#c0392b; font-weight:800}
+.kx-status.off i{background:#c0392b}
