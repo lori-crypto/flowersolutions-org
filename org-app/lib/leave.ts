@@ -22,6 +22,8 @@ export type Quota = { person_id: string; year: number; days: number };
 export type LeaveStatic = {
   boards: LeaveBoard[]; types: LeaveType[]; persons: Person[];
   members: BoardMember[]; rules: Rule[]; me: Person | null; isHr: boolean;
+  /** hétvégi ügyeletet bárkinek felvehet/módosíthat/törölhet (HR, admin vagy külön jog) */
+  canDuty: boolean;
 };
 
 const fail = (e: { message?: string } | null) => { if (e) throw new Error(e.message || "DB hiba"); };
@@ -52,6 +54,7 @@ export async function loadLeaveStatic(): Promise<LeaveStatic> {
     rules: (rulesQ.data as Rule[]) ?? [],
     me: (meQ.data as Person | null) ?? null,
     isHr: caps.has("hr") || caps.has("admin"),
+    canDuty: caps.has("hr") || caps.has("admin") || caps.has("szabadsag.ugyelet"),
   };
 }
 
@@ -96,7 +99,7 @@ export async function updateLeave(id: string, personId: string, day: string, par
     p_id: id, p_person: personId, p_day: day, p_part: part, p_note: note,
   });
   if (error && /app_leave_update|schema cache|PGRST202/i.test(error.message || ""))
-    throw new Error("A szerkesztéshez előbb futtatni kell a 36_ugyelet_szerkesztes.sql fájlt az adatbázison.");
+    throw new Error("A szerkesztéshez előbb futtatni kell a 36-os és 37-es SQL fájlt az adatbázison.");
   fail(error);
 }
 

@@ -199,6 +199,13 @@ export default function SzabadsagPage() {
     alert(`${t("duty_repeat_done")}: ${ok} ✓${skip ? `, ${skip} ✕` : ""}`);
   }
 
+  // Ki mit kezelhet: HR mindent; ügyelet-joggal a hétvégi ügyeletet bárkinél;
+  // mindenki más csak a SAJÁT, önkiszolgáló (szabadság jellegű) bejegyzését, mától előre.
+  const todayIso = iso(new Date());
+  const canManage = (e: LeaveEntry) =>
+    st.isHr || (st.canDuty && e.type_code === "ugyelet") ||
+    (e.person_id === st.me?.id && !!typeMap.get(e.type_code)?.self_service && e.day >= todayIso);
+
   async function removeEntry(e: LeaveEntry) {
     if (!confirm(t("confirm_del_entry"))) return;
     try { await deleteLeave(e.id); await reloadYear(); }
@@ -290,14 +297,14 @@ export default function SzabadsagPage() {
                   {es.map(e => {
                     const ty = typeMap.get(e.type_code);
                     return (
-                      <span key={e.id} className={"entry-chip" + (st.isHr && e.type_code === "ugyelet" ? " editable" : "")}
+                      <span key={e.id} className={"entry-chip" + (canManage(e) ? " editable" : "")}
                             style={{ background: ty?.color }}
-                            onClick={st.isHr && e.type_code === "ugyelet"
+                            onClick={canManage(e)
                               ? ev => { ev.stopPropagation(); setEditEntry(e); } : undefined}
                             title={(e.person?.name ?? "?") + " · " + pick(ty?.name_hu ?? "", ty?.name_ro) + (e.note ? " — " + e.note : "")}>
                         {shortName(e.person?.name ?? "?")}
                         {e.part !== "egesz" && <em>½{e.part === "de" ? "DE" : "DU"}</em>}
-                        {(st.isHr || e.person_id === st.me?.id) && day >= iso(new Date()) && (
+                        {canManage(e) && day >= todayIso && (
                           <button className="chip-del"
                                   onClick={ev => { ev.stopPropagation(); removeEntry(e); }}>✕</button>
                         )}
@@ -380,8 +387,11 @@ export default function SzabadsagPage() {
               <span>{e.part === "egesz" ? "" : e.part === "de" ? "½ DE" : "½ DU"}</span>
               <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)} · {pick(b?.name_hu ?? "", b?.name_ro)}</span>
               <span className="muted">({partWeight(e.part)} {t("day_unit")})</span>
-              {(st.isHr || e.day >= iso(new Date())) && (
-                <button className="del" onClick={() => removeEntry(e)}>✕</button>
+              {canManage(e) && (
+                <>
+                  <button className="pencil" title={t("edit_tip")} onClick={() => setEditEntry(e)}>✎</button>
+                  <button className="del" onClick={() => removeEntry(e)}>✕</button>
+                </>
               )}
             </div>
           );
@@ -462,19 +472,19 @@ export default function SzabadsagPage() {
                     <span>{e.part === "egesz" ? "" : e.part === "de" ? "½ DE" : "½ DU"}</span>
                     <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)}</span>
                     {e.note && <span className="muted">„{e.note}”</span>}
-                    {st.isHr && e.type_code === "ugyelet" && (
-                      <button className="pencil" title={t("edit_tip")}
-                              onClick={() => { setDayModal(null); setEditEntry(e); }}>✎</button>
-                    )}
-                    {(st.isHr || (e.person_id === st.me?.id && day >= iso(new Date()))) && (
-                      <button className="del" onClick={() => removeEntry(e)}>✕</button>
+                    {canManage(e) && (
+                      <>
+                        <button className="pencil" title={t("edit_tip")}
+                                onClick={() => { setDayModal(null); setEditEntry(e); }}>✎</button>
+                        <button className="del" onClick={() => removeEntry(e)}>✕</button>
+                      </>
                     )}
                   </div>
                 );
               })}
               <div className="btns">
                 <button className="btn-cancel" onClick={() => setDayModal(null)}>{t("close")}</button>
-                {st.isHr && (
+                {st.canDuty && (
                   <button className="btn-duty"
                           onClick={() => { setDayModal(null); setShowAdd({ from: day, to: day, type: "ugyelet" }); }}>
                     ＋ {t("add_duty")}
@@ -501,7 +511,8 @@ function AddModal({ st, defaults, onClose, onSave }: {
   onSave: (f: { person: string; from: string; to: string; part: Part; type: string; note: string; skipWeekend: boolean }) => Promise<void>;
 }) {
   const { t, pick } = useI18n();
-  const selectableTypes = st.types.filter(ty => st.isHr || ty.self_service);
+  const selectableTypes = st.types.filter(ty =>
+    st.isHr || ty.self_service || (st.canDuty && ty.code === "ugyelet"));
   const [person, setPerson] = useState(st.me?.id ?? "");
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -517,10 +528,15 @@ function AddModal({ st, defaults, onClose, onSave }: {
   };
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  // másnak csak a HR írhat be; ügyelet-joggal csak ügyeletet
+  const canPickPerson = st.isHr || (st.canDuty && type === "ugyelet");
 
   async function save() {
     setBusy(true); setErr("");
-    try { await onSave({ person, from, to, part, type, note, skipWeekend }); onClose(); }
+    try {
+      await onSave({ person: canPickPerson ? person : (st.me?.id ?? person), from, to, part, type, note, skipWeekend });
+      onClose();
+    }
     catch (e) { setErr((e as Error).message); setBusy(false); }
   }
 
@@ -528,7 +544,7 @@ function AddModal({ st, defaults, onClose, onSave }: {
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
         <h3>{t("add_leave")}</h3>
-        {st.isHr && (
+        {canPickPerson && (
           <>
             <label>{t("f_person")}</label>
             <select className="sel" value={person} onChange={e => setPerson(e.target.value)}>
@@ -589,6 +605,8 @@ function EditModal({ st, entry, onClose, onSave, onDelete }: {
   const [err, setErr] = useState("");
   const ty = st.types.find(x => x.code === entry.type_code);
   const known = st.persons.some(p => p.id === entry.person_id);
+  const todayIso = iso(new Date());
+  const canPickPerson = st.isHr || (st.canDuty && entry.type_code === "ugyelet");
   const changed = person !== entry.person_id || day !== entry.day || part !== entry.part
     || note !== (entry.note ?? "");
 
@@ -606,13 +624,18 @@ function EditModal({ st, entry, onClose, onSave, onDelete }: {
           <span className="dot" style={{ background: ty?.color }} />
           <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)}</span>
         </div>
-        <label>{t("f_person")}</label>
-        <select className="sel" value={person} onChange={e => setPerson(e.target.value)}>
-          {!known && <option value={entry.person_id}>{entry.person?.name ?? "?"}</option>}
-          {st.persons.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+        {canPickPerson && (
+          <>
+            <label>{t("f_person")}</label>
+            <select className="sel" value={person} onChange={e => setPerson(e.target.value)}>
+              {!known && <option value={entry.person_id}>{entry.person?.name ?? "?"}</option>}
+              {st.persons.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </>
+        )}
         <label>{t("f_day")}</label>
-        <input type="date" value={day} onChange={e => setDay(e.target.value)} />
+        <input type="date" value={day} min={st.isHr || canPickPerson ? undefined : todayIso}
+               onChange={e => setDay(e.target.value)} />
         <label>{t("f_part")}</label>
         <select className="sel" value={part} onChange={e => setPart(e.target.value as Part)}>
           <option value="egesz">{t("part_egesz")}</option>

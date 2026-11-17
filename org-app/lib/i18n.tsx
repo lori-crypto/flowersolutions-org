@@ -311,6 +311,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   no_access:        { hu: "Nincs hozzáférésed ehhez a modulhoz — szólj a vezetőnek, ha szükséged van rá.", ro: "Nu ai acces la acest modul — anunță managerul dacă ai nevoie de el." },
   cap_tabla_view:   { hu: "Szervezési tábla (megtekintés)", ro: "Organigrama (vizualizare)" },
   cap_szabadsag:    { hu: "Szabadságos tábla", ro: "Planificator concedii" },
+  cap_ugyelet:      { hu: "Hétvégi ügyelet beosztása (szerkesztés)", ro: "Planificarea serviciului de weekend (editare)" },
   cap_posztleiras_view: { hu: "Posztleírások (megtekintés)", ro: "Fișe de post (vizualizare)" },
   cap_self_lock:    { hu: "A saját admin jogodat nem veheted el.", ro: "Nu îți poți retrage propriul drept de admin." },
   p_hint:           { hu: "A kolléga felvétele után azonnal szerepel a szervezési táblán kiosztható személyek és a szabadság-táblák között. Belépési fiókot később kap: azt egyelőre a Supabase-ben hozzuk létre az email-címével (a meghívó emailes automatika készül).", ro: "După adăugare, colegul poate fi asignat pe organigramă și pe planificatoarele de concedii. Contul de autentificare se creează separat, pe baza emailului." },

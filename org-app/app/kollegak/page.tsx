@@ -15,6 +15,7 @@ type PersonRow = {
 const CAPS = [
   { key: "tabla", tk: "cap_tabla_view" },
   { key: "szabadsag", tk: "cap_szabadsag" },
+  { key: "szabadsag.ugyelet", tk: "cap_ugyelet" },
   { key: "posztleiras", tk: "cap_posztleiras_view" },
   { key: "penztar", tk: "cap_penztar" },
   { key: "penz.ellenorzes", tk: "cap_penzell" },
