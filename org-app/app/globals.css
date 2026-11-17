@@ -618,3 +618,7 @@ body.editing .hint{display:block}
 .kx-status i{width:.7em; height:.7em; border-radius:50%; background:#2e9e56}
 .kx-status.off{color:#c0392b; font-weight:800}
 .kx-status.off i{background:#c0392b}
+
+/* Szabadságos tábla: HR-nek az ügyelet-címke kattintható (szerkesztés) */
+.entry-chip.editable{cursor:pointer}
+.entry-chip.editable:hover{filter:brightness(1.12)}

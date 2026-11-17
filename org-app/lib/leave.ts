@@ -90,6 +90,16 @@ export async function addLeave(boardId: string, personId: string, days: string[]
   fail(error);
 }
 
+/** Meglévő bejegyzés módosítása (HR): más kolléga, nap, napszak, megjegyzés. */
+export async function updateLeave(id: string, personId: string, day: string, part: Part, note: string) {
+  const { error } = await supabase.rpc("app_leave_update", {
+    p_id: id, p_person: personId, p_day: day, p_part: part, p_note: note,
+  });
+  if (error && /app_leave_update|schema cache|PGRST202/i.test(error.message || ""))
+    throw new Error("A szerkesztéshez előbb futtatni kell a 36_ugyelet_szerkesztes.sql fájlt az adatbázison.");
+  fail(error);
+}
+
 export async function deleteLeave(id: string) {
   const { error } = await supabase.rpc("app_leave_delete", { p_id: id });
   fail(error);

@@ -8,7 +8,7 @@ import { TopNav, fetchMyCaps, capHas, routeForCaps, NoAccessScreen } from "@/lib
 import { shortName } from "@/lib/names";
 import {
   LeaveStatic, LeaveEntry, Blackout, Holiday, Quota, Part,
-  loadLeaveStatic, loadLeaveYear, addLeave, deleteLeave,
+  loadLeaveStatic, loadLeaveYear, addLeave, deleteLeave, updateLeave,
   addBlackout, deleteBlackout, updateBlackout, setRule, setQuota, setMembership,
   generateHolidays,
   usedQuotaDays, partWeight,
@@ -42,6 +42,7 @@ export default function SzabadsagPage() {
   } | null>(null);
   const [showAdd, setShowAdd] = useState<null | { from: string; to: string; type?: string }>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
+  const [editEntry, setEditEntry] = useState<LeaveEntry | null>(null);
   const [showAdmin, setShowAdmin] = useState(false);
   const [quotasAll, setQuotasAll] = useState<Quota[]>([]);
   const [err, setErr] = useState("");
@@ -289,7 +290,10 @@ export default function SzabadsagPage() {
                   {es.map(e => {
                     const ty = typeMap.get(e.type_code);
                     return (
-                      <span key={e.id} className="entry-chip" style={{ background: ty?.color }}
+                      <span key={e.id} className={"entry-chip" + (st.isHr && e.type_code === "ugyelet" ? " editable" : "")}
+                            style={{ background: ty?.color }}
+                            onClick={st.isHr && e.type_code === "ugyelet"
+                              ? ev => { ev.stopPropagation(); setEditEntry(e); } : undefined}
                             title={(e.person?.name ?? "?") + " · " + pick(ty?.name_hu ?? "", ty?.name_ro) + (e.note ? " — " + e.note : "")}>
                         {shortName(e.person?.name ?? "?")}
                         {e.part !== "egesz" && <em>½{e.part === "de" ? "DE" : "DU"}</em>}
@@ -419,6 +423,18 @@ export default function SzabadsagPage() {
                   onSave={submitAdd} />
       )}
 
+      {editEntry && (
+        <EditModal st={st} entry={editEntry} onClose={() => setEditEntry(null)}
+                   onSave={async f => {
+                     await updateLeave(editEntry.id, f.person, f.day, f.part, f.note);
+                     await reloadYear();
+                   }}
+                   onDelete={async () => {
+                     if (!confirm(t("confirm_del_entry"))) return false;
+                     await deleteLeave(editEntry.id); await reloadYear(); return true;
+                   }} />
+      )}
+
       {dayModal && (() => {
         const day = dayModal;
         const es = entriesByDay.get(day) ?? [];
@@ -446,6 +462,10 @@ export default function SzabadsagPage() {
                     <span>{e.part === "egesz" ? "" : e.part === "de" ? "½ DE" : "½ DU"}</span>
                     <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)}</span>
                     {e.note && <span className="muted">„{e.note}”</span>}
+                    {st.isHr && e.type_code === "ugyelet" && (
+                      <button className="pencil" title={t("edit_tip")}
+                              onClick={() => { setDayModal(null); setEditEntry(e); }}>✎</button>
+                    )}
                     {(st.isHr || (e.person_id === st.me?.id && day >= iso(new Date()))) && (
                       <button className="del" onClick={() => removeEntry(e)}>✕</button>
                     )}
@@ -547,6 +567,66 @@ function AddModal({ st, defaults, onClose, onSave }: {
         <div className="btns">
           <button className="btn-cancel" onClick={onClose}>{t("cancel")}</button>
           <button className="btn-save" onClick={save} disabled={busy}>{t("save")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Szerkesztő modal (HR): meglévő bejegyzés — jellemzően hétvégi ügyelet — átírása ──
+function EditModal({ st, entry, onClose, onSave, onDelete }: {
+  st: LeaveStatic; entry: LeaveEntry;
+  onClose: () => void;
+  onSave: (f: { person: string; day: string; part: Part; note: string }) => Promise<void>;
+  onDelete: () => Promise<boolean>;
+}) {
+  const { t, pick } = useI18n();
+  const [person, setPerson] = useState(entry.person_id);
+  const [day, setDay] = useState(entry.day);
+  const [part, setPart] = useState<Part>(entry.part);
+  const [note, setNote] = useState(entry.note ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const ty = st.types.find(x => x.code === entry.type_code);
+  const known = st.persons.some(p => p.id === entry.person_id);
+  const changed = person !== entry.person_id || day !== entry.day || part !== entry.part
+    || note !== (entry.note ?? "");
+
+  async function run(fn: () => Promise<boolean | void>) {
+    setBusy(true); setErr("");
+    try { if ((await fn()) === false) { setBusy(false); return; } onClose(); }
+    catch (e) { setErr((e as Error).message); setBusy(false); }
+  }
+
+  return (
+    <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        <h3>{entry.type_code === "ugyelet" ? t("edit_duty") : t("edit_entry")}</h3>
+        <div className="my-row" style={{ borderBottom: "none", paddingLeft: 0 }}>
+          <span className="dot" style={{ background: ty?.color }} />
+          <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)}</span>
+        </div>
+        <label>{t("f_person")}</label>
+        <select className="sel" value={person} onChange={e => setPerson(e.target.value)}>
+          {!known && <option value={entry.person_id}>{entry.person?.name ?? "?"}</option>}
+          {st.persons.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <label>{t("f_day")}</label>
+        <input type="date" value={day} onChange={e => setDay(e.target.value)} />
+        <label>{t("f_part")}</label>
+        <select className="sel" value={part} onChange={e => setPart(e.target.value as Part)}>
+          <option value="egesz">{t("part_egesz")}</option>
+          <option value="de">{t("part_de")}</option>
+          <option value="du">{t("part_du")}</option>
+        </select>
+        <label>{t("f_note")}</label>
+        <input type="text" value={note} onChange={e => setNote(e.target.value)} />
+        {err && <div className="err">{err}</div>}
+        <div className="btns">
+          <button className="btn-cancel" onClick={onClose}>{t("cancel")}</button>
+          <button className="btn-duty" disabled={busy} onClick={() => run(onDelete)}>✕ {t("delete")}</button>
+          <button className="btn-save" disabled={busy || !changed || !day}
+                  onClick={() => run(() => onSave({ person, day, part, note }))}>{t("save")}</button>
         </div>
       </div>
     </div>
