@@ -26,12 +26,13 @@ export function routeForCaps(caps: Set<string>): string | null {
   if (has("szabadsag")) return "/szabadsag";
   if (has("posztleiras")) return "/posztleirasok";
   if (has("penztar") || has("hr") || has("penz.ellenorzes")) return "/penztar";
+  if (has("homerseklet") || has("homerseklet.beallitas")) return "/homerseklet";
   return null;
 }
 
 // Tiltó képernyő fejléccel és menüvel — sosem zsákutca
 export function NoAccessScreen({ active }: {
-  active: "tabla" | "leave" | "people" | "desc" | "stat" | "penztar";
+  active: "tabla" | "leave" | "people" | "desc" | "stat" | "penztar" | "temp";
 }) {
   const { t, lang, setLang } = useI18n();
   return (
@@ -56,7 +57,7 @@ export function NoAccessScreen({ active }: {
 // látja, amelyek pipálva vannak nála. (A tényleges védelem az
 // adatbázisban van — ez a kényelmi réteg.)
 export function TopNav({ active }: {
-  active: "tabla" | "leave" | "people" | "desc" | "stat" | "penztar";
+  active: "tabla" | "leave" | "people" | "desc" | "stat" | "penztar" | "temp";
 }) {
   const { t } = useI18n();
   const [caps, setCaps] = useState<Set<string> | null>(null);
@@ -77,6 +78,7 @@ export function TopNav({ active }: {
     { k: "desc", href: "/posztleirasok", label: t("nav_desc"), show: has("posztleiras") },
     { k: "stat", href: "/statisztika", label: t("nav_stat"), show: hr },
     { k: "penztar", href: "/penztar", label: t("nav_penztar"), show: hr || has("penztar") || has("penz.ellenorzes") },
+    { k: "temp", href: "/homerseklet", label: t("nav_temp"), show: has("homerseklet") || has("homerseklet.beallitas") },
   ];
   return (
     <nav className="topnav">

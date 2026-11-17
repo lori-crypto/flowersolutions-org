@@ -1,0 +1,8 @@
+[Unit]
+Description=FS hőmérséklet-figyelő — második ellenőr
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/fs-homero-orszem

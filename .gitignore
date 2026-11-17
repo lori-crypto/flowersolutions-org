@@ -19,3 +19,7 @@ adatok/
 # fali kijelző — a kész telepítő a kulcsot tartalmazza, az előnézet valós neveket
 kijelzo/*.KESZ.sh
 kijelzo/*.png
+
+# hőmérséklet-panel — a Supabase-adatok helyben maradnak
+homerseklet-firmware/config.h
+homerseklet-orszem/orszem.env

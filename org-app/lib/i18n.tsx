@@ -138,6 +138,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   p_react:          { hu: "Visszaaktiválás", ro: "Reactivare" },
   p_boards:         { hu: "Szabadság-táblák", ro: "Planificatoare" },
   nav_penztar:      { hu: "Pénztár", ro: "Casierie" },
+  nav_temp:         { hu: "Hőmérséklet", ro: "Temperatură" },
   pz_title:         { hu: "Pénztár — napi zárás", ro: "Casierie — închidere zilnică" },
   pz_no_access:     { hu: "Nincs jogosultságod a pénztár modulhoz.", ro: "Nu ai acces la modulul de casierie." },
   pz_no_unit:       { hu: "Még nem vagy egyetlen egységhez sem beosztva — szólj a vezetőnek.", ro: "Nu ești alocat la nicio unitate — anunță managerul." },
