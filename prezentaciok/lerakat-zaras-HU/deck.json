@@ -1,0 +1,17 @@
+{
+  "v": 4,
+  "createdOnFiles": { "v": 1, "at": "2026-10-13T19:30:00Z" },
+  "lists": "css",
+  "title": "Lerakati pénztárzárás – útmutató",
+  "order": ["cover", "intro", "belepes", "lepes1-nexus", "lepes2-monetar", "lepes3-koltsegek", "lepes4-sofor", "keplet", "lepes5-elteres", "lepes6-lezaras", "elozmenyek", "utana", "hibak", "zaro"],
+  "sections": {
+    "s1": { "description": "Mi a lerakati napi zárás és hogyan érjük el.", "start": "cover" },
+    "s2": { "description": "A zárás hat lépése az űrlap sorrendjében.", "start": "lepes1-nexus" },
+    "s3": { "description": "Előzmények, újranyitás, ellenőrzés és a gyakori hibák.", "start": "elozmenyek" }
+  },
+  "faces": {
+    "fredoka": { "family": "Fredoka", "href": "https://fonts.googleapis.com/css2?family=Fredoka:wght@400..700&display=swap" },
+    "nunito-sans": { "family": "Nunito Sans", "href": "https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap" }
+  },
+  "designSystems": []
+}

@@ -1,0 +1,17 @@
+{
+  "v": 4,
+  "createdOnFiles": { "v": 1, "at": "2026-10-13T10:00:00Z" },
+  "lists": "css",
+  "title": "Închiderea casei – ghid pentru florărie",
+  "order": ["cover", "intro", "intrare", "pas1-schimb", "pas2-monetar", "pas3-cheltuieli", "pas4-z", "pas5-card", "formula", "pas6-inchidere", "dupa", "greseli", "final"],
+  "sections": {
+    "s1": { "description": "Ce este închiderea zilnică și cum ajungi la ea.", "start": "cover" },
+    "s2": { "description": "Cei șase pași ai închiderii, în ordinea din aplicație.", "start": "pas1-schimb" },
+    "s3": { "description": "Ce se întâmplă după închidere și ce greșeli să eviți.", "start": "dupa" }
+  },
+  "faces": {
+    "fredoka": { "family": "Fredoka", "href": "https://fonts.googleapis.com/css2?family=Fredoka:wght@400..700&display=swap" },
+    "nunito-sans": { "family": "Nunito Sans", "href": "https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap" }
+  },
+  "designSystems": []
+}
