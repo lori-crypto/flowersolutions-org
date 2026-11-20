@@ -156,19 +156,34 @@ export default function KijelzoSzabadsag() {
   // „hátralevő rész” mód: hetek a mai hét hétfőjétől december 31-ig
   const hatra = cfg?.resz === "hatra" || cfg?.resz === "ev" ? cfg.resz === "hatra" : data.modes?.[board.id] === "hatra";
   const yearEnd = `${year}-12-31`;
-  const weeks: Date[][] = [];
+  // hónaponként külön blokk: a hónap-sáv alatt az adott hónap hetei; a két hónapba átnyúló
+  // hét mindkét blokkban megjelenik, de mindegyikben csak a saját hónapja napjaival
+  type WRow = { kind: "month"; label: string; key: string } | { kind: "week"; days: (Date | null)[]; key: string };
+  const rows: WRow[] = [];
+  let firstWeek: Date[] = [];
   if (hatra) {
-    const d = new Date(today + "T00:00:00");
-    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-    while (iso(d) <= yearEnd && weeks.length < 60) {
-      const w: Date[] = [];
-      for (let i = 0; i < 7; i++) { w.push(new Date(d)); d.setDate(d.getDate() + 1); }
-      weeks.push(w);
+    const start = new Date(today + "T00:00:00");
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    for (let m = parseInt(today.slice(5, 7), 10) - 1; m < 12 && today.slice(0, 4) === String(year); m++) {
+      rows.push({ kind: "month", key: "m" + m,
+        label: new Date(year, m, 1).toLocaleDateString(locale, { month: "long" }) });
+      const d = new Date(start);
+      while (d.getFullYear() === year && d.getMonth() <= m && rows.length < 120) {
+        const w: (Date | null)[] = [];
+        for (let i = 0; i < 7; i++) {
+          const x = new Date(d);
+          w.push(x.getMonth() === m && x.getFullYear() === year && iso(x) >= today ? x : null);
+          if (firstWeek.length < 7) firstWeek.push(x);
+          d.setDate(d.getDate() + 1);
+        }
+        if (w.some(Boolean)) rows.push({ kind: "week", days: w, key: "w" + m + iso(d) });
+      }
     }
   }
+  const weekCount = rows.filter(r => r.kind === "week").length;
   // kevés hét → nagy betűk; sok hét → kisebbek, hogy mindig kiférjen
-  const kw = Math.max(0.55, Math.min(1.6, 10 / Math.max(1, weeks.length)));
-  const wdNames = weeks[0]?.map(dt => dt.toLocaleDateString(locale, { weekday: "long", timeZone: TZ })) ?? [];
+  const kw = Math.max(0.55, Math.min(1.6, 10 / Math.max(1, weekCount)));
+  const wdNames = firstWeek.map(dt => dt.toLocaleDateString(locale, { weekday: "long", timeZone: TZ }));
   const usedTypes = data.types.filter(t => data.entries.some(e => e.board_id === board.id && e.type_code === t.code));
 
   return (
@@ -201,34 +216,34 @@ export default function KijelzoSzabadsag() {
       </header>
 
       {hatra ? (
-        <div className="kx-weeks" style={{ gridTemplateRows: `2.1em repeat(${weeks.length}, minmax(0, 1fr))` }}>
+        <div className="kx-weeks"
+             style={{ gridTemplateRows: `2.1em ${rows.map(r => r.kind === "month" ? "2.3em" : "minmax(0, 1fr)").join(" ")}` }}>
           {wdNames.map((n, i) => <div key={"wd" + i} className={"kw-wd" + (i >= 5 ? " we" : "")}>{n}</div>)}
-          {weeks.flat().map((dt, i) => {
-            const day = iso(dt);
-            if (day < today || day > yearEnd) return <div key={day} className="kw-cell kw-out" />;
-            const es = byDay.get(day) ?? [];
-            const hol = holidays.get(day);
-            const we = i % 7 >= 5;
-            const cls = "kw-cell" + (we ? " we" : "") + (hol ? " hol" : "") + (blocked.has(day) ? " blk" : "")
-              + (day === today ? " today" : "");
-            const showMonth = dt.getDate() === 1 || day === today;
-            return (
-              <div key={day} className={cls} style={{ ["--kw" as string]: kw }}>
-                <div className="kw-top">
-                  <b>{dt.getDate()}</b>
-                  {showMonth && <span className="kw-mon">{dt.toLocaleDateString(locale, { month: "long" })}</span>}
-                  {hol && <span className="kw-hol">★ {pick(hol.name_hu, hol.name_ro)}</span>}
-                </div>
-                <div className="kw-tags">
-                  {es.map(e => (
-                    <i key={e.id} style={{ background: typeMap.get(e.type_code)?.color }}>
-                      {e.name}{e.part !== "egesz" ? " ½" : ""}
-                    </i>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+          {rows.map(r => r.kind === "month"
+            ? <div key={r.key} className="kw-month">{r.label}</div>
+            : r.days.map((dt, i) => {
+                if (!dt) return <div key={r.key + i} className="kw-cell kw-out" />;
+                const day = iso(dt);
+                const es = byDay.get(day) ?? [];
+                const hol = holidays.get(day);
+                const cls = "kw-cell" + (i >= 5 ? " we" : "") + (hol ? " hol" : "") + (blocked.has(day) ? " blk" : "")
+                  + (day === today ? " today" : "");
+                return (
+                  <div key={r.key + i} className={cls} style={{ ["--kw" as string]: kw }}>
+                    <div className="kw-top">
+                      <b>{dt.getDate()}</b>
+                      {hol && <span className="kw-hol">★ {pick(hol.name_hu, hol.name_ro)}</span>}
+                    </div>
+                    <div className="kw-tags">
+                      {es.map(e => (
+                        <i key={e.id} style={{ background: typeMap.get(e.type_code)?.color }}>
+                          {e.name}{e.part !== "egesz" ? " ½" : ""}
+                        </i>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }))}
         </div>
       ) : (
       <div className="kx-wall">
