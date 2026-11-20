@@ -11,8 +11,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
  *                 a mai héttől december 31-ig; a mezők kitöltik a képernyőt.
  *   &resz=ev      mindig az egész év.
  *   Ha a címben nincs &resz=, a szabadságos oldalon (HR) táblánként átkapcsolható
- *   „Fali monitor” beállítás dönt (leave_rules.kijelzo_mod) — percenként frissül.
- * Percenként magától frissül; ha nincs hálózat, az utolsó jó adat marad kint és piros
+ *   „Fali monitor” beállítás dönt (leave_rules.kijelzo_mod) — 15 mp-en belül átvált.
+ * 15 másodpercenként magától frissül; ha nincs hálózat, az utolsó jó adat marad kint és piros
  * jelzés mutatja. Naponta hajnalban újratölti magát, hogy az új verzió is megérkezzen.
  * A méretezés a képernyő magasságához igazodik (em), így Full HD-n és 4K-n is kitölti
  * a monitort görgetés nélkül.
@@ -29,7 +29,7 @@ type Data = {
   modes?: Record<string, string>;
 };
 
-const REFRESH_MS = 60_000;
+const REFRESH_MS = 15_000; // 15 mp: a szabadságos oldali nézet-kapcsoló gyorsan érvényesüljön
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 // A kijelzőt hajtó gép órája lehet UTC-re állítva (szerver) — a „ma” és az óra ezért mindig
@@ -76,7 +76,7 @@ export default function KijelzoSzabadsag() {
     if (!key) setBadKey(true);
   }, []);
 
-  // adat: azonnal, majd percenként; hiba esetén a régi adat marad
+  // adat: azonnal, majd 15 mp-enként; hiba esetén a régi adat marad
   useEffect(() => {
     if (!cfg?.key) return;
     let stop = false;

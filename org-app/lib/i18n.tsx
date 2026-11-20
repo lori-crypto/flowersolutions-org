@@ -81,7 +81,7 @@ const DICT: Record<string, { hu: string; ro: string }> = {
   kiosk_mode:       { hu: "Fali monitor", ro: "Monitor perete" },
   kiosk_whole:      { hu: "egész év", ro: "tot anul" },
   kiosk_rest:       { hu: "hátralevő hetek", ro: "săptămânile rămase" },
-  kiosk_hint:       { hu: "A falra tett monitor nézete ennél a táblánál — kb. egy percen belül átvált.", ro: "Vizualizarea monitorului de perete pentru acest panou — se schimbă în aproximativ un minut." },
+  kiosk_hint:       { hu: "A falra tett monitor nézete ennél a táblánál — kb. 15 másodpercen belül átvált.", ro: "Vizualizarea monitorului de perete pentru acest panou — se schimbă în aproximativ 15 secunde." },
   quota:            { hu: "Éves keret", ro: "Zile pe an" },
   used:             { hu: "Felhasznált", ro: "Folosite" },
   left:             { hu: "Hátralévő", ro: "Rămase" },
