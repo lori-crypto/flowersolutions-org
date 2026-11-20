@@ -1,6 +1,31 @@
 # Projekt-állapot
 
-Utolsó frissítés: 2026-08-19
+Utolsó frissítés: 2026-11-20
+
+## Ellenőrzés az élő adatbázisban (2026-11-20)
+
+- ✅ **Mind a 38 SQL-fájl (`sql/01`–`38`) lefutott**, nincs futtatandó migráció.
+  (A régebbi „futtatandó!” megjegyzések lent már nem érvényesek.)
+- ✅ **Szabadság + ügyelet** használatban: 74 bejegyzés (utolsó: 11-17);
+  ügyelet-szerkesztés és saját szerkesztési jog bent (SQL 36–37).
+- ✅ **Pénztár (kassza)** napi használatban: 107 lezárt nap (utolsó: 11-19).
+  Benne: NEXUS casa-szinkron, napló, ellenőrzés, sofőr–ügyfél, újranyitás,
+  havi egyenleg, sofőr aznapi nézet, pénzellenőrzés, mentés-védelem (SQL 23–35).
+- ✅ Telefonos belépés (SQL 33), modul-szintű jogosultságok (SQL 32).
+- ✅ Webshop-szinkron fut (webshop_cycles ma 08:20 UTC-kor frissült) → a Vercel
+  env-ek rendben.
+- ⏳ **Hőmérséklet-figyelő** (SQL 38): a rendszer él, de **csak az 5 DEMÓ panel**
+  fut (`homerseklet_demo.sql`). Valódi eszköz bekötése után:
+  `sql/homerseklet_demo_torles.sql`.
+- ⏳ **Posztleírások**: tábla + felület kész (SQL 08), de **0 leírás** van feltöltve.
+- ✅ **Fali kijelző a printszerveren** (`kijelzo/`): a monitor (DP-1) bekapcsolva,
+  a Firefox-kioszk 11-18 óta megszakítás nélkül fut, és az
+  `org.flowersolutions.ro/kijelzo/szabadsag` címet mutatja. Az adat-végpont 200-zal
+  válaszol (2026: 69 bejegyzés, ebből 18 mai vagy jövőbeli, 21 ünnepnap). A kioszk
+  címében nincs `tabla`/`valt`, ezért csak a Lerakat-tábla látszik. A Virágüzlet 1–2
+  táblán egyelőre nincs is bejegyzés.
+- ✅ Az org.flowersolutions.ro domain él (a kijelző ezen keresztül tölt be).
+- ❓ Nem ellenőrizve: service worker, meghívó-email.
 
 ## Kész
 

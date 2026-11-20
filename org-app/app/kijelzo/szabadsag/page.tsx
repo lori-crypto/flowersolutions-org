@@ -7,6 +7,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
  *   &tabla=2      melyik tábla (1-től számozva; alap: az első)
  *   &valt=30      másodpercenként váltson a táblák között (alap: nem vált)
  *   &lang=ro      román feliratok (alap: magyar)
+ *   &resz=hatra   csak az év hátralevő része, hetes naptárként (soronként egy hét, H–V),
+ *                 a mai héttől december 31-ig; a mezők kitöltik a képernyőt.
+ *   &resz=ev      mindig az egész év.
+ *   Ha a címben nincs &resz=, a szabadságos oldalon (HR) táblánként átkapcsolható
+ *   „Fali monitor” beállítás dönt (leave_rules.kijelzo_mod) — percenként frissül.
  * Percenként magától frissül; ha nincs hálózat, az utolsó jó adat marad kint és piros
  * jelzés mutatja. Naponta hajnalban újratölti magát, hogy az új verzió is megérkezzen.
  * A méretezés a képernyő magasságához igazodik (em), így Full HD-n és 4K-n is kitölti
@@ -21,6 +26,7 @@ type Holiday = { day: string; name_hu: string; name_ro: string | null };
 type Data = {
   today: string; year: number; boards: Board[]; types: LType[];
   entries: Entry[]; blackouts: Blackout[]; holidays: Holiday[];
+  modes?: Record<string, string>;
 };
 
 const REFRESH_MS = 60_000;
@@ -49,7 +55,7 @@ const TXT = {
 };
 
 export default function KijelzoSzabadsag() {
-  const [cfg, setCfg] = useState<{ key: string; tabla: number; valt: number; lang: "hu" | "ro" } | null>(null);
+  const [cfg, setCfg] = useState<{ key: string; tabla: number; valt: number; lang: "hu" | "ro"; resz: string } | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [badKey, setBadKey] = useState(false);
   const [lastOk, setLastOk] = useState<Date | null>(null);
@@ -65,7 +71,7 @@ export default function KijelzoSzabadsag() {
     keyRef.current = key;
     const tabla = Math.max(1, parseInt(q.get("tabla") || "1", 10) || 1);
     const valt = Math.max(0, parseInt(q.get("valt") || "0", 10) || 0);
-    setCfg({ key, tabla, valt, lang: q.get("lang") === "ro" ? "ro" : "hu" });
+    setCfg({ key, tabla, valt, lang: q.get("lang") === "ro" ? "ro" : "hu", resz: q.get("resz") ?? "" });
     setBoardIdx(tabla - 1);
     if (!key) setBadKey(true);
   }, []);
@@ -147,6 +153,22 @@ export default function KijelzoSzabadsag() {
   const today = tzParts(now).day;              // romániai idő szerinti mai nap
   const year = data.year;
   const todays = byDay.get(today) ?? [];
+  // „hátralevő rész” mód: hetek a mai hét hétfőjétől december 31-ig
+  const hatra = cfg?.resz === "hatra" || cfg?.resz === "ev" ? cfg.resz === "hatra" : data.modes?.[board.id] === "hatra";
+  const yearEnd = `${year}-12-31`;
+  const weeks: Date[][] = [];
+  if (hatra) {
+    const d = new Date(today + "T00:00:00");
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    while (iso(d) <= yearEnd && weeks.length < 60) {
+      const w: Date[] = [];
+      for (let i = 0; i < 7; i++) { w.push(new Date(d)); d.setDate(d.getDate() + 1); }
+      weeks.push(w);
+    }
+  }
+  // kevés hét → nagy betűk; sok hét → kisebbek, hogy mindig kiférjen
+  const kw = Math.max(0.55, Math.min(1.6, 10 / Math.max(1, weeks.length)));
+  const wdNames = weeks[0]?.map(dt => dt.toLocaleDateString(locale, { weekday: "long", timeZone: TZ })) ?? [];
   const usedTypes = data.types.filter(t => data.entries.some(e => e.board_id === board.id && e.type_code === t.code));
 
   return (
@@ -178,6 +200,37 @@ export default function KijelzoSzabadsag() {
         </div>
       </header>
 
+      {hatra ? (
+        <div className="kx-weeks" style={{ gridTemplateRows: `2.1em repeat(${weeks.length}, minmax(0, 1fr))` }}>
+          {wdNames.map((n, i) => <div key={"wd" + i} className={"kw-wd" + (i >= 5 ? " we" : "")}>{n}</div>)}
+          {weeks.flat().map((dt, i) => {
+            const day = iso(dt);
+            if (day < today || day > yearEnd) return <div key={day} className="kw-cell kw-out" />;
+            const es = byDay.get(day) ?? [];
+            const hol = holidays.get(day);
+            const we = i % 7 >= 5;
+            const cls = "kw-cell" + (we ? " we" : "") + (hol ? " hol" : "") + (blocked.has(day) ? " blk" : "")
+              + (day === today ? " today" : "");
+            const showMonth = dt.getDate() === 1 || day === today;
+            return (
+              <div key={day} className={cls} style={{ ["--kw" as string]: kw }}>
+                <div className="kw-top">
+                  <b>{dt.getDate()}</b>
+                  {showMonth && <span className="kw-mon">{dt.toLocaleDateString(locale, { month: "long" })}</span>}
+                  {hol && <span className="kw-hol">★ {pick(hol.name_hu, hol.name_ro)}</span>}
+                </div>
+                <div className="kw-tags">
+                  {es.map(e => (
+                    <i key={e.id} style={{ background: typeMap.get(e.type_code)?.color }}>
+                      {e.name}{e.part !== "egesz" ? " ½" : ""}
+                    </i>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
       <div className="kx-wall">
         {Array.from({ length: 12 }, (_, m) => {
           const dim = new Date(year, m + 1, 0).getDate();
@@ -219,6 +272,7 @@ export default function KijelzoSzabadsag() {
           );
         })}
       </div>
+      )}
 
       <footer className="kx-foot">
         <span className="kx-legend">

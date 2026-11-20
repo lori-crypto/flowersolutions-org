@@ -237,6 +237,26 @@ export default function SzabadsagPage() {
           ))}
         </div>
         <div className="leave-nav">
+          {st.isHr && (() => {
+            const mode = st.rules.find(r => r.board_id === boardId && r.key === "kijelzo_mod")?.value === "hatra" ? "hatra" : "ev";
+            const pickMode = (m: "ev" | "hatra") => {
+              if (m === mode) return;
+              setRule(boardId, "kijelzo_mod", m)
+                .then(() => setSt(s => s && ({
+                  ...s,
+                  rules: [...s.rules.filter(r => !(r.board_id === boardId && r.key === "kijelzo_mod")),
+                          { board_id: boardId, key: "kijelzo_mod", value: m }],
+                })))
+                .catch(e => setErr((e as Error).message));
+            };
+            return (
+              <span className="kiosk-switch" title={t("kiosk_hint")}>
+                <span className="kiosk-switch-l">🖥 {t("kiosk_mode")}:</span>
+                <button className={"mini-btn" + (mode === "ev" ? " on" : "")} onClick={() => pickMode("ev")}>{t("kiosk_whole")}</button>
+                <button className={"mini-btn" + (mode === "hatra" ? " on" : "")} onClick={() => pickMode("hatra")}>{t("kiosk_rest")}</button>
+              </span>
+            );
+          })()}
           <button className="mini-btn" onClick={() => setView(view === "honap" ? "ev" : "honap")}>
             {view === "honap" ? t("view_year") : t("view_month")}
           </button>
