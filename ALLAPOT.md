@@ -12,8 +12,13 @@ Utolsó frissítés: 2026-11-20
   Benne: NEXUS casa-szinkron, napló, ellenőrzés, sofőr–ügyfél, újranyitás,
   havi egyenleg, sofőr aznapi nézet, pénzellenőrzés, mentés-védelem (SQL 23–35).
 - ✅ Telefonos belépés (SQL 33), modul-szintű jogosultságok (SQL 32).
-- 🔨 **Kivett ünnepnap: kötelező megadni, melyik ünnep helyett** (2026-11-23,
-  `sql/39_unnepnap_valasztas.sql` — **futtatandó**, utána push). Ha az ünnep
+- ✅ **Nyomtatható szabadság-kérvény** (2026-11-23, `/szabadsag/cerere`, SQL 40 lefutott):
+  román „Cerere de concediu de odihnă” + külön lap a kivett ünnepnapra, FSS fejléc,
+  Kovács Loránd jóváhagyó; automatikus, évente újrainduló iktatószám első nyomtatáskor.
+  Beírás után felajánlja a nyomtatást, ill. 🖨 gomb a listákban. Nyitott kérdés a
+  könyvelőnek: a tevékenység a Codul muncii 141. cikke alá esik-e (30 napos kiadás).
+- ✅ **Kivett ünnepnap: kötelező megadni, melyik ünnep helyett** (2026-11-23,
+  `sql/39_unnepnap_valasztas.sql` lefutott, élesítve). Ha az ünnep
   napján veszik ki, automatikus; ugyanazt az ünnepet egy kolléga csak egyszer
   veheti ki. A falitábláról 11-23-án bevitt 9 régebbi zöld bejegyzésnél még nincs
   megadva az ünnep (csak szerkesztéskor kéri).

@@ -70,6 +70,7 @@ export default function SzabadsagPage() {
   const [showAdd, setShowAdd] = useState<null | { from: string; to: string; type?: string }>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [editEntry, setEditEntry] = useState<LeaveEntry | null>(null);
+  const [printIds, setPrintIds] = useState<string[] | null>(null); // beírás után: kérvény nyomtatása
   const [showAdmin, setShowAdmin] = useState(false);
   const [quotasAll, setQuotasAll] = useState<Quota[]>([]);
   const [err, setErr] = useState("");
@@ -201,6 +202,12 @@ export default function SzabadsagPage() {
     if (!days.length) throw new Error(t("err_range"));
     await addLeave(boardId, form.person, days, form.part, form.type, form.note, form.holiday);
     await reloadYear();
+    if (form.type === "szabadsag" || form.type === UNNEP) {
+      const { data: ins } = await supabase.from("leave_entries").select("id")
+        .eq("person_id", form.person).eq("type_code", form.type).in("day", days);
+      const ids = ((ins as { id: string }[]) ?? []).map(x => x.id);
+      if (ids.length) setPrintIds(ids);
+    }
   }
 
   /** A beírt hétvégi ügyelet-mintát végigmásolja az év üres hétvégéire. */
@@ -246,6 +253,29 @@ export default function SzabadsagPage() {
   const canManage = (e: LeaveEntry) =>
     st.isHr || (st.canDuty && e.type_code === "ugyelet") ||
     (e.person_id === st.me?.id && !!typeMap.get(e.type_code)?.self_service && e.day >= todayIso);
+
+  // Kérvény nyomtatása: saját bejegyzés vagy HR; szabadságnál az egybefüggő időszak egy lapon
+  const canPrint = (e: LeaveEntry) =>
+    (e.type_code === "szabadsag" || e.type_code === UNNEP) && (st.isHr || e.person_id === st.me?.id);
+  const openPrint = (ids: string[]) =>
+    window.open("/szabadsag/cerere?ids=" + ids.join(","), "_blank");
+  const printFor = (e: LeaveEntry) => {
+    if (e.type_code !== "szabadsag") return openPrint([e.id]);
+    const mine = [...new Map([...data.entries, ...data.myEntries]
+      .filter(x => x.person_id === e.person_id && x.type_code === "szabadsag")
+      .map(x => [x.id, x])).values()].sort((a, b) => a.day.localeCompare(b.day));
+    const isGapFree = (a: string, b: string) => {
+      const d = new Date(a + "T00:00:00"); d.setDate(d.getDate() + 1);
+      const end = new Date(b + "T00:00:00");
+      for (; d < end; d.setDate(d.getDate() + 1))
+        if (![0, 6].includes(d.getDay()) && !allHolMap.has(iso(d))) return false;
+      return true;
+    };
+    let i = mine.findIndex(x => x.id === e.id), lo = i, hi = i;
+    while (lo > 0 && isGapFree(mine[lo - 1].day, mine[lo].day)) lo--;
+    while (hi < mine.length - 1 && isGapFree(mine[hi].day, mine[hi + 1].day)) hi++;
+    openPrint(mine.slice(lo, hi + 1).map(x => x.id));
+  };
 
   async function removeEntry(e: LeaveEntry) {
     if (!confirm(t("confirm_del_entry"))) return;
@@ -449,6 +479,7 @@ export default function SzabadsagPage() {
               <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)} · {pick(b?.name_hu ?? "", b?.name_ro)}</span>
               {holFor(e) && <span className="muted">{holFor(e)}</span>}
               <span className="muted">({partWeight(e.part)} {t("day_unit")})</span>
+              {canPrint(e) && <button className="pencil" title={t("print_req")} onClick={() => printFor(e)}>🖨</button>}
               {canManage(e) && (
                 <>
                   <button className="pencil" title={t("edit_tip")} onClick={() => setEditEntry(e)}>✎</button>
@@ -483,6 +514,19 @@ export default function SzabadsagPage() {
                           setQuotasAll((q as Quota[]) ?? []);
                         }} />
           )}
+        </div>
+      )}
+
+      {printIds && (
+        <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setPrintIds(null); }}>
+          <div className="modal">
+            <h3>✓ {t("added_title")}</h3>
+            <p style={{ margin: "8px 0 14px" }}>{t("added_print")}</p>
+            <div className="btns">
+              <button className="btn-cancel" onClick={() => setPrintIds(null)}>{t("later")}</button>
+              <button className="btn-save" onClick={() => { openPrint(printIds); setPrintIds(null); }}>🖨 {t("print_req")}</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -536,6 +580,7 @@ export default function SzabadsagPage() {
                     <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)}</span>
                     {holFor(e) && <span className="muted">{holFor(e)}</span>}
                     {e.note && <span className="muted">„{e.note}”</span>}
+                    {canPrint(e) && <button className="pencil" title={t("print_req")} onClick={() => printFor(e)}>🖨</button>}
                     {canManage(e) && (
                       <>
                         <button className="pencil" title={t("edit_tip")}
