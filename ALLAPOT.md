@@ -17,6 +17,9 @@ Utolsó frissítés: 2026-11-20
   Kovács Loránd jóváhagyó; automatikus, évente újrainduló iktatószám első nyomtatáskor.
   Beírás után felajánlja a nyomtatást, ill. 🖨 gomb a listákban. Nyitott kérdés a
   könyvelőnek: a tevékenység a Codul muncii 141. cikke alá esik-e (30 napos kiadás).
+- ✅ **Karácsonyi VAGY szilveszteri hét** (2026-11-23, `sql/43_karacsony_szilveszter.sql`
+  lefutott): trigger; a kettő közül csak egyikre írhatja be magát a kolléga (az ünnep napján
+  kivett ünnepnap nem számít), HR kivételt tehet. Peres Edit 2026-os mindkét hetes beírása marad.
 - ✅ **Betelt napra: jóváhagyásra vár** (2026-11-23, `sql/42_jovahagyas.sql` lefutott):
   a korlát feletti beírás `status='fuggo'`, Telegram-üzenet Jóváhagyom/Elutasítom gombbal
   (a hőmérséklet-bot, `temp_config.leave_chat_id`), HR-doboz az appban; elutasítva a
