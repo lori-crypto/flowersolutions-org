@@ -21,6 +21,8 @@ const UNNEP = "unnepnap_kivet";
 
 type Row = LeaveEntry & { board: { name_hu: string; name_ro: string | null } | null };
 
+const iso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const ro = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
 const partRo = (p: string) => p === "de" ? "jumătate de zi (prima parte a zilei)"
   : p === "du" ? "jumătate de zi (a doua parte a zilei)" : "";
@@ -64,11 +66,17 @@ function Signatures() {
   );
 }
 
-function Odihna({ rows, reg }: { rows: Row[]; reg: Reg }) {
+function Odihna({ rows, reg, holMap }: { rows: Row[]; reg: Reg; holMap: Map<string, Holiday> }) {
   const p = rows[0];
   const total = rows.reduce((s, r) => s + weight(r.part), 0);
   const from = rows[0].day, to = rows[rows.length - 1].day;
   const halves = rows.filter(r => r.part !== "egesz");
+  // az időszakba eső, munkanapra eső ünnepnapok (nem számítanak a szabadságba)
+  const inHol: Holiday[] = [];
+  for (const d = new Date(from + "T00:00:00"); iso(d) < to; d.setDate(d.getDate() + 1)) {
+    const h = holMap.get(iso(d));
+    if (h && ![0, 6].includes(d.getDay())) inHol.push(h);
+  }
   return (
     <section className="c-page">
       <Header reg={reg} />
@@ -88,6 +96,16 @@ function Odihna({ rows, reg }: { rows: Row[]; reg: Reg }) {
           {rows.map((r, i) => (
             <span key={r.id}>{ro(r.day)}{r.part !== "egesz" ? ` (${partRo(r.part)})` : ""}{i < rows.length - 1 ? ", " : "."}</span>
           ))}
+        </p>
+      )}
+      {inHol.length > 0 && (
+        <p>
+          {inHol.length === 1 ? "Ziua de sărbătoare legală " : "Zilele de sărbătoare legală "}
+          {inHol.map((h, i) => (
+            <span key={h.day}><b>{ro(h.day)}</b> ({h.name_ro || h.name_hu}){i < inHol.length - 1 ? ", " : ""}</span>
+          ))}
+          {inHol.length === 1 ? " nu se include" : " nu se includ"} în concediul de odihnă; pentru
+          {inHol.length === 1 ? " aceasta se depune cerere separată." : " acestea se depun cereri separate."}
         </p>
       )}
       <p>Pe perioada concediului, atribuțiile mele vor fi preluate de: .....................................................</p>
@@ -174,8 +192,8 @@ function CererePage() {
       const B = { name_hu: "Lerakat", name_ro: "Depozit" };
       const mk = (id: string, day: string, type: string, hol: string | null = null, part = "egesz") =>
         ({ id, board_id: "b", person_id: "p", day, part, type_code: type, note: null, person: P, board: B, holiday_day: hol }) as Row;
-      setRows([mk("1", "2026-12-28", "szabadsag"), mk("2", "2026-12-29", "szabadsag"), mk("3", "2026-12-30", "szabadsag"),
-               mk("4", "2026-12-31", "szabadsag"), mk("5", "2026-12-07", UNNEP, "2026-12-01"), mk("6", "2026-12-01", UNNEP, "2026-12-01")]);
+      setRows([mk("1", "2026-12-24", "szabadsag"), mk("2", "2026-12-28", "szabadsag"), mk("3", "2026-12-29", "szabadsag"),
+               mk("6", "2026-12-25", UNNEP, "2026-12-25")]);
       setHols([{ day: "2026-12-01", name_hu: "Románia nemzeti ünnepe", name_ro: "Ziua Națională" },
                { day: "2026-12-25", name_hu: "Karácsony", name_ro: "Crăciunul" }]);
       return;
@@ -254,7 +272,7 @@ function CererePage() {
         )}
       </div>
       {nothing && <div className="center-msg">Ezekhez a bejegyzésekhez nem készül kérvény.</div>}
-      {odihna.map(g => <Odihna key={g[0].id} rows={g} reg={regs[g[0].id] ?? null} />)}
+      {odihna.map(g => <Odihna key={g[0].id} rows={g} reg={regs[g[0].id] ?? null} holMap={holMap} />)}
       {comp.map(r => <Compensatorie key={r.id} r={r} reg={regs[r.id] ?? null}
                                     hol={r.holiday_day ? holMap.get(r.holiday_day) : undefined} />)}
     </div>

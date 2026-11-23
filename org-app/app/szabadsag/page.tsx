@@ -188,6 +188,7 @@ export default function SzabadsagPage() {
     note: string; skipWeekend: boolean; holiday: string | null;
   }) {
     const days: string[] = [];
+    const holDays: string[] = []; // szabadság közé eső ünnepnapok → külön „kivett ünnepnap”
     const d = new Date(form.from + "T00:00:00");
     const end = new Date(form.to + "T00:00:00");
     if (end < d) throw new Error(t("err_range"));
@@ -195,16 +196,28 @@ export default function SzabadsagPage() {
       const dayIso = iso(d);
       const dow = d.getDay();
       // kivett ünnepnapnál magát az ünnepnapot nem szűrjük ki (azon is kivehető)
-      const skipHol = holidayMap.has(dayIso) && form.type !== UNNEP;
-      if (!(form.skipWeekend && (dow === 0 || dow === 6 || skipHol))) days.push(dayIso);
+      const isWe = dow === 0 || dow === 6;
+      if (form.type === "szabadsag" && holidayMap.has(dayIso)) {
+        // az ünnepnap nem szabadság: a napján kivett ünnepnapként kerül be (saját kérvénnyel)
+        if (!(form.skipWeekend && isWe)) holDays.push(dayIso);
+      } else {
+        // kivett ünnepnapnál magát az ünnepnapot nem szűrjük ki (azon is kivehető)
+        const skipHol = holidayMap.has(dayIso) && form.type !== UNNEP;
+        if (!(form.skipWeekend && (isWe || skipHol))) days.push(dayIso);
+      }
       d.setDate(d.getDate() + 1);
     }
     if (!days.length) throw new Error(t("err_range"));
     await addLeave(boardId, form.person, days, form.part, form.type, form.note, form.holiday);
+    // a szabadság közé eső ünnepnapok: egyenként, hogy egy foglalt nap ne akassza meg a többit
+    for (const h of holDays) {
+      try { await addLeave(boardId, form.person, [h], form.part, UNNEP, form.note, h); }
+      catch { /* már van bejegyzése azon a napon / zárolt / betelt — kihagyjuk */ }
+    }
     await reloadYear();
     if (form.type === "szabadsag" || form.type === UNNEP) {
       const { data: ins } = await supabase.from("leave_entries").select("id")
-        .eq("person_id", form.person).eq("type_code", form.type).in("day", days);
+        .eq("person_id", form.person).in("type_code", ["szabadsag", UNNEP]).in("day", [...days, ...holDays]);
       const ids = ((ins as { id: string }[]) ?? []).map(x => x.id);
       if (ids.length) setPrintIds(ids);
     }
@@ -274,7 +287,13 @@ export default function SzabadsagPage() {
     let i = mine.findIndex(x => x.id === e.id), lo = i, hi = i;
     while (lo > 0 && isGapFree(mine[lo - 1].day, mine[lo].day)) lo--;
     while (hi < mine.length - 1 && isGapFree(mine[hi].day, mine[hi + 1].day)) hi++;
-    openPrint(mine.slice(lo, hi + 1).map(x => x.id));
+    // az időszakba eső, napján kivett ünnepnapok külön kérvénye is menjen vele
+    const a = mine[lo].day, b = mine[hi].day;
+    const hols = [...new Map([...data.entries, ...data.myEntries]
+      .filter(x => x.person_id === e.person_id && x.type_code === UNNEP && x.day > a && x.day < b
+        && (x.holiday_day ?? x.day) === x.day)
+      .map(x => [x.id, x])).values()].map(x => x.id);
+    openPrint([...mine.slice(lo, hi + 1).map(x => x.id), ...hols]);
   };
 
   async function removeEntry(e: LeaveEntry) {
