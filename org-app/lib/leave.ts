@@ -19,7 +19,8 @@ export type Blackout = {
 export type Holiday = { day: string; name_hu: string; name_ro: string | null };
 export type BoardMember = { person_id: string; board_id: string };
 export type Rule = { board_id: string; key: string; value: string };
-export type Quota = { person_id: string; year: number; days: number };
+export type Quota = { person_id: string; year: number; days: number;
+  /** előző évről áthozott napok (SQL 41) */ carry_over?: number };
 
 export type LeaveStatic = {
   boards: LeaveBoard[]; types: LeaveType[]; persons: Person[];
@@ -67,7 +68,7 @@ export async function loadLeaveStatic(): Promise<LeaveStatic> {
 /** Egy tábla egy évének bejegyzései + zárolásai + ünnepnapok + saját keret. */
 export async function loadLeaveYear(boardId: string, year: number, personId: string | null) {
   const from = `${year}-01-01`, to = `${year}-12-31`;
-  const [entriesQ, blackoutsQ, holidaysQ, quotaQ, myEntriesQ] = await Promise.all([
+  const [entriesQ, blackoutsQ, holidaysQ, quotaQ, myEntriesQ, myHolQ] = await Promise.all([
     supabase.from("leave_entries").select("*, person:persons(*)")
       .eq("board_id", boardId).gte("day", from).lte("day", to).order("day"),
     supabase.from("blackout_periods").select("*").eq("board_id", boardId),
@@ -79,14 +80,20 @@ export async function loadLeaveYear(boardId: string, year: number, personId: str
       ? supabase.from("leave_entries").select("*, person:persons(*)")
           .eq("person_id", personId).gte("day", from).lte("day", to).order("day")
       : Promise.resolve({ data: [], error: null }),
+    // az idei ünnepnapok kivétele (akár jövő év elején is) — a számlálóhoz
+    personId
+      ? supabase.from("leave_entries").select("*, person:persons(*)").eq("person_id", personId)
+          .eq("type_code", "unnepnap_kivet").gte("holiday_day", from).lte("holiday_day", to)
+      : Promise.resolve({ data: [], error: null }),
   ]);
-  for (const q of [entriesQ, blackoutsQ, holidaysQ, quotaQ, myEntriesQ]) fail((q as { error: { message?: string } | null }).error);
+  for (const q of [entriesQ, blackoutsQ, holidaysQ, quotaQ, myEntriesQ, myHolQ]) fail((q as { error: { message?: string } | null }).error);
   return {
     entries: (entriesQ.data as LeaveEntry[]) ?? [],
     blackouts: (blackoutsQ.data as Blackout[]) ?? [],
     holidays: (holidaysQ.data as Holiday[]) ?? [],
     quota: (quotaQ.data as Quota | null) ?? null,
     myEntries: (myEntriesQ.data as LeaveEntry[]) ?? [],
+    myHolEntries: (myHolQ.data as LeaveEntry[]) ?? [],
   };
 }
 
@@ -136,8 +143,11 @@ export async function setRule(boardId: string, key: string, value: string) {
   const { error } = await supabase.from("leave_rules").upsert({ board_id: boardId, key, value });
   fail(error);
 }
-export async function setQuota(personId: string, year: number, days: number) {
-  const { error } = await supabase.from("leave_quotas").upsert({ person_id: personId, year, days });
+export async function setQuota(personId: string, year: number, days: number, carry = 0) {
+  const { error } = await supabase.from("leave_quotas")
+    .upsert({ person_id: personId, year, days, carry_over: carry });
+  if (error && /carry_over/i.test(error.message || ""))
+    throw new Error("Előbb futtatni kell a 41-es SQL fájlt az adatbázison.");
   fail(error);
 }
 export async function setMembership(personId: string, boardId: string, member: boolean) {
@@ -227,4 +237,74 @@ export const partWeight = (p: Part) => (p === "egesz" ? 1 : 0.5);
 export function usedQuotaDays(myEntries: LeaveEntry[], types: LeaveType[]): number {
   const quotaTypes = new Set(types.filter(t => t.counts_quota).map(t => t.code));
   return myEntries.reduce((s, e) => s + (quotaTypes.has(e.type_code) ? partWeight(e.part) : 0), 0);
+}
+
+// ── Számláló (szabadság + ünnepnapok) ───────────────────────
+/** A számlálók ettől az évtől számolnak (2026-ban még papíron ment). */
+export const COUNT_FROM_YEAR = 2027;
+
+/** húsvét/pünkösd: katolikus vagy ortodox (a név alapján) — a kettő közül csak egy jár */
+export function holidayAlt(h: Holiday): { grp: string; fel: "kat" | "ort" } | null {
+  const n = h.name_hu.toLowerCase();
+  const grp = /húsvét|nagypéntek/.test(n) ? "husvet" : /pünkösd/.test(n) ? "punkosd" : null;
+  const fel = n.includes("(katolikus)") ? "kat" : n.includes("(ortodox)") ? "ort" : null;
+  return grp && fel ? { grp, fel } : null;
+}
+
+export type LeaveSummary = {
+  quota: number | null; carry: number; total: number | null; used: number; left: number | null;
+  /** az évben járó (hétköznapra eső) ünnepnapok */
+  holDue: Holiday[]; holTaken: number;
+  /** már elmúlt, de még nincs beírva */
+  holMissing: Holiday[];
+  /** csoport → választott felekezet (ha már kivett belőle) */
+  chosen: Record<string, "kat" | "ort">;
+};
+
+/**
+ * szab: a kolléga szabadság-bejegyzései az évben (day szerint);
+ * unnep: kivett ünnepnapjai, amelyek az év ünnepeire vonatkoznak (holiday_day szerint);
+ * hols: az év ünnepnapjai.
+ */
+export function leaveSummary(quota: Quota | null, szab: LeaveEntry[], unnep: LeaveEntry[],
+                             hols: Holiday[], today: string): LeaveSummary {
+  const used = szab.filter(e => e.type_code === "szabadsag").reduce((s, e) => s + partWeight(e.part), 0);
+  const carry = Number(quota?.carry_over ?? 0);
+  const q = quota ? Number(quota.days) : null;
+  const total = q != null ? q + carry : null;
+  const takenDays = new Set(unnep.filter(e => e.type_code === "unnepnap_kivet" && e.holiday_day)
+    .map(e => e.holiday_day as string));
+  const chosen: Record<string, "kat" | "ort"> = {};
+  for (const h of hols) {
+    const a = holidayAlt(h);
+    if (a && takenDays.has(h.day)) chosen[a.grp] = a.fel;
+  }
+  const holDue = hols.filter(h => {
+    const dow = new Date(h.day + "T00:00:00").getDay();
+    if (dow === 0 || dow === 6) return false;
+    const a = holidayAlt(h);
+    if (!a) return true;
+    // még nem döntött: az ortodox napokkal számolunk (ugyanannyi nap)
+    return a.fel === (chosen[a.grp] ?? "ort");
+  }).sort((a, b) => a.day.localeCompare(b.day));
+  const holTaken = holDue.filter(h => takenDays.has(h.day)).length;
+  const holMissing = holDue.filter(h => h.day < today && !takenDays.has(h.day));
+  return { quota: q, carry, total, used, left: total != null ? total - used : null,
+           holDue, holTaken, holMissing, chosen };
+}
+
+/** HR-összesítő: a megadott kollégák évi szabadsága, kivett ünnepnapjai és kerete */
+export async function loadLeaveOverview(year: number, personIds: string[]) {
+  const from = `${year}-01-01`, to = `${year}-12-31`;
+  if (!personIds.length) return { szab: [] as LeaveEntry[], unnep: [] as LeaveEntry[], quotas: [] as Quota[] };
+  const [sq, uq, qq] = await Promise.all([
+    supabase.from("leave_entries").select("*").in("person_id", personIds)
+      .eq("type_code", "szabadsag").gte("day", from).lte("day", to),
+    supabase.from("leave_entries").select("*").in("person_id", personIds)
+      .eq("type_code", "unnepnap_kivet").gte("holiday_day", from).lte("holiday_day", to),
+    supabase.from("leave_quotas").select("*").eq("year", year).in("person_id", personIds),
+  ]);
+  for (const r of [sq, uq, qq]) fail(r.error);
+  return { szab: (sq.data as LeaveEntry[]) ?? [], unnep: (uq.data as LeaveEntry[]) ?? [],
+           quotas: (qq.data as Quota[]) ?? [] };
 }

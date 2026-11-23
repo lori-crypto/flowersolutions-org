@@ -12,6 +12,7 @@ import {
   addBlackout, deleteBlackout, updateBlackout, setRule, setQuota, setMembership,
   generateHolidays,
   usedQuotaDays, partWeight,
+  COUNT_FROM_YEAR, holidayAlt, leaveSummary, loadLeaveOverview, LeaveSummary,
 } from "@/lib/leave";
 
 // Helyi dátum → YYYY-MM-DD (NEM UTC! különben UTC+2-ben egy napot csúszna)
@@ -65,7 +66,7 @@ export default function SzabadsagPage() {
   const [view, setView] = useState<"honap" | "ev">("ev");
   const [data, setData] = useState<{
     entries: LeaveEntry[]; blackouts: Blackout[]; holidays: Holiday[];
-    quota: Quota | null; myEntries: LeaveEntry[];
+    quota: Quota | null; myEntries: LeaveEntry[]; myHolEntries: LeaveEntry[];
   } | null>(null);
   const [showAdd, setShowAdd] = useState<null | { from: string; to: string; type?: string }>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
@@ -73,6 +74,8 @@ export default function SzabadsagPage() {
   const [printIds, setPrintIds] = useState<string[] | null>(null); // beírás után: kérvény nyomtatása
   const [showAdmin, setShowAdmin] = useState(false);
   const [quotasAll, setQuotasAll] = useState<Quota[]>([]);
+  const [showSum, setShowSum] = useState(false);
+  const [overview, setOverview] = useState<{ person: { id: string; name: string }; s: LeaveSummary }[] | null>(null);
   const [err, setErr] = useState("");
   const [canView, setCanView] = useState<boolean | null>(null);
 
@@ -160,6 +163,7 @@ export default function SzabadsagPage() {
   if (!st || !data) return <div className="center-msg">{t("loading")}</div>;
 
   const board = st.boards.find(b => b.id === boardId);
+  const todayIsoTop = iso(new Date());
   const used = usedQuotaDays(data.myEntries, st.types);
   const quotaDays = data.quota?.days ?? null;
 
@@ -170,10 +174,39 @@ export default function SzabadsagPage() {
     const h = allHolMap.get(e.holiday_day);
     return "★ " + (h ? holName(h) : "") + " (" + e.holiday_day.slice(5) + ") " + t("holiday_for");
   };
-  const usedHolidays = (personId: string, exceptId?: string) => new Set(
-    [...data.entries, ...data.myEntries]
+  const usedHolidays = (personId: string, exceptId?: string) => {
+    const used = new Set([...data.entries, ...data.myEntries, ...data.myHolEntries]
       .filter(e => e.person_id === personId && e.id !== exceptId && e.holiday_day)
       .map(e => e.holiday_day as string));
+    // katolikus VAGY ortodox: ha az egyikből már kivett, a másik nem választható (ugyanabban az évben)
+    const picked = st.allHolidays.filter(h => used.has(h.day))
+      .map(h => ({ y: h.day.slice(0, 4), a: holidayAlt(h) })).filter(x => x.a);
+    for (const h of st.allHolidays) {
+      const a = holidayAlt(h);
+      if (a && picked.some(x => x.y === h.day.slice(0, 4) && x.a!.grp === a.grp && x.a!.fel !== a.fel)) used.add(h.day);
+    }
+    return used;
+  };
+
+  // számláló (2027-től): saját szabadság + ünnepnapok
+  const counting = year >= COUNT_FROM_YEAR;
+  const mySum = counting ? leaveSummary(data.quota, data.myEntries, data.myHolEntries,
+    st.allHolidays.filter(h => h.day.startsWith(String(year))), todayIsoTop) : null;
+  const holLabel = (h: Holiday, s: LeaveSummary) => {
+    const a = holidayAlt(h);
+    const nm = a && !s.chosen[a.grp] ? h.name_hu.replace(/\s*\((ortodox|katolikus)\)/, "") + " (" + t("hol_either") + ")" : holName(h);
+    return nm + " " + h.day.slice(8, 10) + "." + h.day.slice(5, 7) + ".";
+  };
+  async function loadOverview() {
+    const ids = st!.members.filter(m => m.board_id === boardId).map(m => m.person_id);
+    const o = await loadLeaveOverview(year, ids);
+    const hols = st!.allHolidays.filter(h => h.day.startsWith(String(year)));
+    setOverview(st!.persons.filter(p => ids.includes(p.id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(p => ({ person: { id: p.id, name: p.name }, s: leaveSummary(
+        o.quotas.find(q => q.person_id === p.id) ?? null,
+        o.szab.filter(e => e.person_id === p.id), o.unnep.filter(e => e.person_id === p.id), hols, todayIsoTop) })));
+  }
 
   const monthName = (m: number) =>
     new Date(year, m, 1).toLocaleDateString(locale, { month: "long" });
@@ -374,10 +407,22 @@ export default function SzabadsagPage() {
       {err && <div className="leave-err">{err}</div>}
 
       {/* saját összesítő */}
-      <div className="my-quota">
-        <b>{st.me?.name}</b> · {t("quota")}: {quotaDays ?? "—"} · {t("used")}: {used} ·{" "}
-        {t("left")}: {quotaDays != null ? quotaDays - used : "—"}
-      </div>
+      {mySum ? (
+        <div className="my-quota">
+          <b>{st.me?.name}</b> · {t("quota")}: {mySum.quota ?? "—"}
+          {mySum.carry ? <> + {mySum.carry} {t("carry")}</> : null} · {t("used")}: {mySum.used} ·{" "}
+          {t("left")}: <b>{mySum.left ?? "—"}</b> · ★ {t("hol_count")}: <b>{mySum.holTaken}/{mySum.holDue.length}</b>
+          {mySum.holMissing.length > 0 && (
+            <div className="quota-warn">⚠ {t("hol_missing")}: {mySum.holMissing.map(h => holLabel(h, mySum)).join(", ")}</div>
+          )}
+        </div>
+      ) : (
+        <div className="my-quota">
+          <b>{st.me?.name}</b> · {t("quota")}: {quotaDays ?? "—"} · {t("used")}: {used} ·{" "}
+          {t("left")}: {quotaDays != null ? quotaDays - used : "—"}
+          <span className="muted"> · {t("count_from")}</span>
+        </div>
+      )}
 
       {view === "honap" ? (
         <div className="month-list">
@@ -511,6 +556,42 @@ export default function SzabadsagPage() {
       </div>
 
       {/* HR beállítások */}
+      {st.isHr && counting && (
+        <div className="admin-box" style={{ paddingBottom: 12 }}>
+          <button className="admin-toggle" onClick={async () => {
+            const open = !showSum; setShowSum(open);
+            if (open) { setOverview(null); try { await loadOverview(); } catch (e) { alert((e as Error).message); } }
+          }}>
+            📊 {t("summary")} · {board ? pick(board.name_hu, board.name_ro) : ""} · {year} {showSum ? "▴" : "▾"}
+          </button>
+          {showSum && (overview == null ? <div className="muted" style={{ padding: 10 }}>{t("loading")}</div> : (
+            <div className="sum-wrap">
+              <table className="sum-table">
+                <thead><tr>
+                  <th>{t("name")}</th><th>{t("quota")}</th><th>{t("carry_long")}</th>
+                  <th>{t("used")}</th><th>{t("left")}</th><th>★ {t("hol_count")}</th><th>{t("hol_missing")}</th>
+                </tr></thead>
+                <tbody>
+                  {overview.map(({ person, s }) => (
+                    <tr key={person.id}>
+                      <td>{person.name}</td>
+                      <td>{s.quota ?? "—"}</td>
+                      <td>{s.carry || "—"}</td>
+                      <td>{s.used}</td>
+                      <td className={s.left != null && s.left < 0 ? "neg" : ""}><b>{s.left ?? "—"}</b></td>
+                      <td>{s.holTaken}/{s.holDue.length}</td>
+                      <td className={s.holMissing.length ? "warn" : "ok"}>
+                        {s.holMissing.length ? s.holMissing.map(h => holLabel(h, s)).join(", ") : "✓"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      )}
+
       {st.isHr && (
         <div className="admin-box">
           <button className="admin-toggle" onClick={async () => {
@@ -926,17 +1007,23 @@ function AdminPanel({ st, boardId, year, lim, blackouts, quotas, onChanged, onRe
       </section>
       <section>
         <h4>{t("quotas")} · {year}</h4>
+        <div className="fhint" style={{ marginBottom: 6 }}>{t("quota")} + {t("carry_long").toLowerCase()}</div>
         {st.persons.map(p => {
           const q = quotas.find(x => x.person_id === p.id);
           const val = qEdit[p.id] ?? (q ? String(q.days) : "");
+          const cv = qEdit["c:" + p.id] ?? (q?.carry_over ? String(q.carry_over) : "");
           return (
             <div className="my-row" key={p.id}>
               <span style={{ flex: 1 }}>{p.name}</span>
-              <input type="number" step="0.5" min={0} style={{ width: 80 }} value={val}
-                     placeholder="—"
+              <input type="number" step="0.5" min={0} style={{ width: 70 }} value={val}
+                     placeholder="—" title={t("quota")}
                      onChange={e => setQEdit(s => ({ ...s, [p.id]: e.target.value }))} />
+              <span className="muted" style={{ fontSize: 12 }}>+</span>
+              <input type="number" step="0.5" min={0} style={{ width: 70 }} value={cv}
+                     placeholder="0" title={t("carry_long")}
+                     onChange={e => setQEdit(s => ({ ...s, ["c:" + p.id]: e.target.value }))} />
               <button className="mini-btn" disabled={val === ""}
-                      onClick={() => run(() => setQuota(p.id, year, parseFloat(val)))}>
+                      onClick={() => run(() => setQuota(p.id, year, parseFloat(val), cv === "" ? 0 : parseFloat(cv)))}>
                 {t("save")}
               </button>
             </div>
