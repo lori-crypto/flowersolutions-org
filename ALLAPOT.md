@@ -12,6 +12,11 @@ Utolsó frissítés: 2026-11-20
   Benne: NEXUS casa-szinkron, napló, ellenőrzés, sofőr–ügyfél, újranyitás,
   havi egyenleg, sofőr aznapi nézet, pénzellenőrzés, mentés-védelem (SQL 23–35).
 - ✅ Telefonos belépés (SQL 33), modul-szintű jogosultságok (SQL 32).
+- 🔨 **Kivett ünnepnap: kötelező megadni, melyik ünnep helyett** (2026-11-23,
+  `sql/39_unnepnap_valasztas.sql` — **futtatandó**, utána push). Ha az ünnep
+  napján veszik ki, automatikus; ugyanazt az ünnepet egy kolléga csak egyszer
+  veheti ki. A falitábláról 11-23-án bevitt 9 régebbi zöld bejegyzésnél még nincs
+  megadva az ünnep (csak szerkesztéskor kéri).
 - ✅ Webshop-szinkron fut (webshop_cycles ma 08:20 UTC-kor frissült) → a Vercel
   env-ek rendben.
 - ⏳ **Hőmérséklet-figyelő** (SQL 38): a rendszer él, de **csak az 5 DEMÓ panel**

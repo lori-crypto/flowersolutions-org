@@ -10,6 +10,8 @@ export type Part = "egesz" | "de" | "du";
 export type LeaveEntry = {
   id: string; board_id: string; person_id: string; day: string; part: Part;
   type_code: string; note: string | null; person: Person | null;
+  /** kivett ünnepnapnál: melyik ünnepnap helyett (SQL 39) */
+  holiday_day?: string | null;
 };
 export type Blackout = {
   id: string; board_id: string; from_day: string; to_day: string; reason: string | null;
@@ -24,12 +26,14 @@ export type LeaveStatic = {
   members: BoardMember[]; rules: Rule[]; me: Person | null; isHr: boolean;
   /** hétvégi ügyeletet bárkinek felvehet/módosíthat/törölhet (HR, admin vagy külön jog) */
   canDuty: boolean;
+  /** az összes ünnepnap (kivett ünnepnap választóhoz, évhatáron át is) */
+  allHolidays: Holiday[];
 };
 
 const fail = (e: { message?: string } | null) => { if (e) throw new Error(e.message || "DB hiba"); };
 
 export async function loadLeaveStatic(): Promise<LeaveStatic> {
-  const [{ data: { session } }, boardsQ, typesQ, personsQ, membersQ, rulesQ, capsQ] =
+  const [{ data: { session } }, boardsQ, typesQ, personsQ, membersQ, rulesQ, capsQ, holQ] =
     await Promise.all([
       supabase.auth.getSession(),
       supabase.from("leave_boards").select("*").order("sort"),
@@ -38,8 +42,9 @@ export async function loadLeaveStatic(): Promise<LeaveStatic> {
       supabase.from("board_members").select("*"),
       supabase.from("leave_rules").select("*"),
       supabase.from("person_capabilities").select("capability"),
+      supabase.from("holidays").select("*").order("day"),
     ]);
-  for (const q of [boardsQ, typesQ, personsQ, membersQ, rulesQ, capsQ]) fail(q.error ?? null);
+  for (const q of [boardsQ, typesQ, personsQ, membersQ, rulesQ, capsQ, holQ]) fail(q.error ?? null);
   const uid = session?.user?.id;
   const persons = (personsQ.data as Person[]) ?? [];
   const meQ = uid
@@ -55,6 +60,7 @@ export async function loadLeaveStatic(): Promise<LeaveStatic> {
     me: (meQ.data as Person | null) ?? null,
     isHr: caps.has("hr") || caps.has("admin"),
     canDuty: caps.has("hr") || caps.has("admin") || caps.has("szabadsag.ugyelet"),
+    allHolidays: (holQ.data as Holiday[]) ?? [],
   };
 }
 
@@ -85,21 +91,24 @@ export async function loadLeaveYear(boardId: string, year: number, personId: str
 }
 
 export async function addLeave(boardId: string, personId: string, days: string[],
-                               part: Part, type: string, note: string) {
+                               part: Part, type: string, note: string, holiday: string | null = null) {
   const { error } = await supabase.rpc("app_leave_add", {
     p_board: boardId, p_person: personId, p_days: days,
-    p_part: part, p_type: type, p_note: note,
+    p_part: part, p_type: type, p_note: note, p_holiday: holiday,
   });
+  if (error && /schema cache|PGRST202/i.test(error.message || ""))
+    throw new Error("Előbb futtatni kell a 39-es SQL fájlt az adatbázison.");
   fail(error);
 }
 
 /** Meglévő bejegyzés módosítása (HR): más kolléga, nap, napszak, megjegyzés. */
-export async function updateLeave(id: string, personId: string, day: string, part: Part, note: string) {
+export async function updateLeave(id: string, personId: string, day: string, part: Part, note: string,
+                                  holiday: string | null = null) {
   const { error } = await supabase.rpc("app_leave_update", {
-    p_id: id, p_person: personId, p_day: day, p_part: part, p_note: note,
+    p_id: id, p_person: personId, p_day: day, p_part: part, p_note: note, p_holiday: holiday,
   });
-  if (error && /app_leave_update|schema cache|PGRST202/i.test(error.message || ""))
-    throw new Error("A szerkesztéshez előbb futtatni kell a 36-os és 37-es SQL fájlt az adatbázison.");
+  if (error && /schema cache|PGRST202/i.test(error.message || ""))
+    throw new Error("Előbb futtatni kell a 39-es SQL fájlt az adatbázison.");
   fail(error);
 }
 

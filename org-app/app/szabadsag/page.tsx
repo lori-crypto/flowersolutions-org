@@ -24,6 +24,33 @@ const MIN_YEAR = 2026;
 // Román állami ünnep → románul; katolikus ünnep → magyarul
 const holName = (h: { name_hu: string; name_ro: string | null }) =>
   h.name_hu.includes("katolikus") ? h.name_hu : (h.name_ro || h.name_hu);
+const UNNEP = "unnepnap_kivet";
+
+/** Kötelező választó: melyik ünnepnap helyett veszi ki (előző + aktuális év ünnepei). */
+function HolidaySelect({ holidays, refDay, used, value, onChange, locale, t }: {
+  holidays: Holiday[]; refDay: string; used: Set<string>; value: string;
+  onChange: (v: string) => void; locale: string;
+  t: (k: "holiday_pick" | "holiday_used") => string;
+}) {
+  const y = Number(refDay.slice(0, 4)) || new Date().getFullYear();
+  const list = holidays.filter(h => {
+    const hy = Number(h.day.slice(0, 4));
+    return hy === y || hy === y - 1;
+  });
+  return (
+    <select className="sel" value={value} onChange={e => onChange(e.target.value)}>
+      <option value="">{t("holiday_pick")}</option>
+      {list.map(h => {
+        const d = new Date(h.day + "T00:00:00");
+        const lbl = d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric", weekday: "short" })
+          + " – " + holName(h);
+        const isUsed = used.has(h.day) && h.day !== value;
+        return <option key={h.day} value={h.day} disabled={isUsed}>
+          {lbl}{isUsed ? " (" + t("holiday_used") + ")" : ""}</option>;
+      })}
+    </select>
+  );
+}
 
 export default function SzabadsagPage() {
   const { t, lang, setLang, pick } = useI18n();
@@ -135,6 +162,18 @@ export default function SzabadsagPage() {
   const used = usedQuotaDays(data.myEntries, st.types);
   const quotaDays = data.quota?.days ?? null;
 
+  // kivett ünnepnap: melyik ünnep helyett (csak ha nem magán az ünnepen vette ki)
+  const allHolMap = new Map(st.allHolidays.map(h => [h.day, h]));
+  const holFor = (e: LeaveEntry) => {
+    if (e.type_code !== UNNEP || !e.holiday_day || e.holiday_day === e.day) return "";
+    const h = allHolMap.get(e.holiday_day);
+    return "★ " + (h ? holName(h) : "") + " (" + e.holiday_day.slice(5) + ") " + t("holiday_for");
+  };
+  const usedHolidays = (personId: string, exceptId?: string) => new Set(
+    [...data.entries, ...data.myEntries]
+      .filter(e => e.person_id === personId && e.id !== exceptId && e.holiday_day)
+      .map(e => e.holiday_day as string));
+
   const monthName = (m: number) =>
     new Date(year, m, 1).toLocaleDateString(locale, { month: "long" });
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -145,7 +184,7 @@ export default function SzabadsagPage() {
 
   async function submitAdd(form: {
     person: string; from: string; to: string; part: Part; type: string;
-    note: string; skipWeekend: boolean;
+    note: string; skipWeekend: boolean; holiday: string | null;
   }) {
     const days: string[] = [];
     const d = new Date(form.from + "T00:00:00");
@@ -154,11 +193,13 @@ export default function SzabadsagPage() {
     while (d <= end) {
       const dayIso = iso(d);
       const dow = d.getDay();
-      if (!(form.skipWeekend && (dow === 0 || dow === 6 || holidayMap.has(dayIso)))) days.push(dayIso);
+      // kivett ünnepnapnál magát az ünnepnapot nem szűrjük ki (azon is kivehető)
+      const skipHol = holidayMap.has(dayIso) && form.type !== UNNEP;
+      if (!(form.skipWeekend && (dow === 0 || dow === 6 || skipHol))) days.push(dayIso);
       d.setDate(d.getDate() + 1);
     }
     if (!days.length) throw new Error(t("err_range"));
-    await addLeave(boardId, form.person, days, form.part, form.type, form.note);
+    await addLeave(boardId, form.person, days, form.part, form.type, form.note, form.holiday);
     await reloadYear();
   }
 
@@ -321,7 +362,7 @@ export default function SzabadsagPage() {
                             style={{ background: ty?.color }}
                             onClick={canManage(e)
                               ? ev => { ev.stopPropagation(); setEditEntry(e); } : undefined}
-                            title={(e.person?.name ?? "?") + " · " + pick(ty?.name_hu ?? "", ty?.name_ro) + (e.note ? " — " + e.note : "")}>
+                            title={(e.person?.name ?? "?") + " · " + pick(ty?.name_hu ?? "", ty?.name_ro) + (holFor(e) ? " · " + holFor(e) : "") + (e.note ? " — " + e.note : "")}>
                         {shortName(e.person?.name ?? "?")}
                         {e.part !== "egesz" && <em>½{e.part === "de" ? "DE" : "DU"}</em>}
                         {canManage(e) && day >= todayIso && (
@@ -406,6 +447,7 @@ export default function SzabadsagPage() {
               <b>{e.day}</b>
               <span>{e.part === "egesz" ? "" : e.part === "de" ? "½ DE" : "½ DU"}</span>
               <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)} · {pick(b?.name_hu ?? "", b?.name_ro)}</span>
+              {holFor(e) && <span className="muted">{holFor(e)}</span>}
               <span className="muted">({partWeight(e.part)} {t("day_unit")})</span>
               {canManage(e) && (
                 <>
@@ -450,13 +492,14 @@ export default function SzabadsagPage() {
 
       {showAdd && (
         <AddModal st={st} defaults={showAdd} onClose={() => setShowAdd(null)}
-                  onSave={submitAdd} />
+                  usedHolidays={usedHolidays} onSave={submitAdd} />
       )}
 
       {editEntry && (
         <EditModal st={st} entry={editEntry} onClose={() => setEditEntry(null)}
+                   usedHolidays={usedHolidays}
                    onSave={async f => {
-                     await updateLeave(editEntry.id, f.person, f.day, f.part, f.note);
+                     await updateLeave(editEntry.id, f.person, f.day, f.part, f.note, f.holiday);
                      await reloadYear();
                    }}
                    onDelete={async () => {
@@ -491,6 +534,7 @@ export default function SzabadsagPage() {
                     <b>{e.person?.name ?? "?"}</b>
                     <span>{e.part === "egesz" ? "" : e.part === "de" ? "½ DE" : "½ DU"}</span>
                     <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)}</span>
+                    {holFor(e) && <span className="muted">{holFor(e)}</span>}
                     {e.note && <span className="muted">„{e.note}”</span>}
                     {canManage(e) && (
                       <>
@@ -524,13 +568,16 @@ export default function SzabadsagPage() {
 }
 
 // ── Beíró modal ───────────────────────────────────────────────
-function AddModal({ st, defaults, onClose, onSave }: {
+function AddModal({ st, defaults, onClose, onSave, usedHolidays }: {
   st: LeaveStatic;
   defaults: { from: string; to: string; type?: string };
   onClose: () => void;
-  onSave: (f: { person: string; from: string; to: string; part: Part; type: string; note: string; skipWeekend: boolean }) => Promise<void>;
+  usedHolidays: (personId: string, exceptId?: string) => Set<string>;
+  onSave: (f: { person: string; from: string; to: string; part: Part; type: string; note: string; skipWeekend: boolean; holiday: string | null }) => Promise<void>;
 }) {
-  const { t, pick } = useI18n();
+  const { t, pick, lang } = useI18n();
+  const locale = lang === "ro" ? "ro-RO" : "hu-HU";
+  const [holiday, setHoliday] = useState("");
   const selectableTypes = st.types.filter(ty =>
     st.isHr || ty.self_service || (st.canDuty && ty.code === "ugyelet"));
   const [person, setPerson] = useState(st.me?.id ?? "");
@@ -550,11 +597,31 @@ function AddModal({ st, defaults, onClose, onSave }: {
   const [err, setErr] = useState("");
   // másnak csak a HR írhat be; ügyelet-joggal csak ügyeletet
   const canPickPerson = st.isHr || (st.canDuty && type === "ugyelet");
+  const forPerson = canPickPerson ? person : (st.me?.id ?? person);
+
+  // kivett ünnepnap: azok a napok, amik NEM maguk ünnepnapok → ezekhez kötelező megadni, melyik ünnep helyett
+  const holSet = useMemo(() => new Set(st.allHolidays.map(h => h.day)), [st]);
+  const isUnnep = type === UNNEP;
+  const otherDays = useMemo(() => {
+    if (!isUnnep || !from || !to) return [] as string[];
+    const out: string[] = [];
+    const d = new Date(from + "T00:00:00"), end = new Date(to + "T00:00:00");
+    while (d <= end && out.length < 400) {
+      const k = iso(d), dow = d.getDay();
+      if (!holSet.has(k) && !(skipWeekend && (dow === 0 || dow === 6))) out.push(k);
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }, [isUnnep, from, to, skipWeekend, holSet]);
+  const needHoliday = otherDays.length > 0;
 
   async function save() {
+    if (needHoliday && otherDays.length > 1) { setErr(t("err_holiday_one")); return; }
+    if (needHoliday && !holiday) { setErr(t("err_holiday_req")); return; }
     setBusy(true); setErr("");
     try {
-      await onSave({ person: canPickPerson ? person : (st.me?.id ?? person), from, to, part, type, note, skipWeekend });
+      await onSave({ person: forPerson, from, to, part, type, note, skipWeekend,
+                     holiday: needHoliday ? holiday : null });
       onClose();
     }
     catch (e) { setErr((e as Error).message); setBusy(false); }
@@ -590,6 +657,13 @@ function AddModal({ st, defaults, onClose, onSave }: {
             <option key={ty.code} value={ty.code}>{pick(ty.name_hu, ty.name_ro)}</option>
           ))}
         </select>
+        {isUnnep && (needHoliday ? (
+          <>
+            <label>{t("f_holiday")} *</label>
+            <HolidaySelect holidays={st.allHolidays} refDay={from} used={usedHolidays(forPerson)}
+                           value={holiday} onChange={setHoliday} locale={locale} t={t} />
+          </>
+        ) : <div className="fhint" style={{ marginTop: 6 }}>★ {t("holiday_auto")}</div>)}
         <label>{t("f_note")}</label>
         <input type="text" value={note} onChange={e => setNote(e.target.value)} />
         <div className="chk">
@@ -610,13 +684,15 @@ function AddModal({ st, defaults, onClose, onSave }: {
 }
 
 // ── Szerkesztő modal (HR): meglévő bejegyzés — jellemzően hétvégi ügyelet — átírása ──
-function EditModal({ st, entry, onClose, onSave, onDelete }: {
+function EditModal({ st, entry, onClose, onSave, onDelete, usedHolidays }: {
   st: LeaveStatic; entry: LeaveEntry;
   onClose: () => void;
-  onSave: (f: { person: string; day: string; part: Part; note: string }) => Promise<void>;
+  usedHolidays: (personId: string, exceptId?: string) => Set<string>;
+  onSave: (f: { person: string; day: string; part: Part; note: string; holiday: string | null }) => Promise<void>;
   onDelete: () => Promise<boolean>;
 }) {
-  const { t, pick } = useI18n();
+  const { t, pick, lang } = useI18n();
+  const locale = lang === "ro" ? "ro-RO" : "hu-HU";
   const [person, setPerson] = useState(entry.person_id);
   const [day, setDay] = useState(entry.day);
   const [part, setPart] = useState<Part>(entry.part);
@@ -627,8 +703,13 @@ function EditModal({ st, entry, onClose, onSave, onDelete }: {
   const known = st.persons.some(p => p.id === entry.person_id);
   const todayIso = iso(new Date());
   const canPickPerson = st.isHr || (st.canDuty && entry.type_code === "ugyelet");
+  const isUnnep = entry.type_code === UNNEP;
+  const onHolidayDay = st.allHolidays.some(h => h.day === day);
+  const needHoliday = isUnnep && !onHolidayDay;
+  const origHol = entry.holiday_day && entry.holiday_day !== entry.day ? entry.holiday_day : "";
+  const [holiday, setHoliday] = useState(origHol);
   const changed = person !== entry.person_id || day !== entry.day || part !== entry.part
-    || note !== (entry.note ?? "");
+    || note !== (entry.note ?? "") || (needHoliday && holiday !== origHol);
 
   async function run(fn: () => Promise<boolean | void>) {
     setBusy(true); setErr("");
@@ -662,6 +743,13 @@ function EditModal({ st, entry, onClose, onSave, onDelete }: {
           <option value="de">{t("part_de")}</option>
           <option value="du">{t("part_du")}</option>
         </select>
+        {needHoliday && (
+          <>
+            <label>{t("f_holiday")} *</label>
+            <HolidaySelect holidays={st.allHolidays} refDay={day} used={usedHolidays(person, entry.id)}
+                           value={holiday} onChange={setHoliday} locale={locale} t={t} />
+          </>
+        )}
         <label>{t("f_note")}</label>
         <input type="text" value={note} onChange={e => setNote(e.target.value)} />
         {err && <div className="err">{err}</div>}
@@ -669,7 +757,10 @@ function EditModal({ st, entry, onClose, onSave, onDelete }: {
           <button className="btn-cancel" onClick={onClose}>{t("cancel")}</button>
           <button className="btn-duty" disabled={busy} onClick={() => run(onDelete)}>✕ {t("delete")}</button>
           <button className="btn-save" disabled={busy || !changed || !day}
-                  onClick={() => run(() => onSave({ person, day, part, note }))}>{t("save")}</button>
+                  onClick={() => run(async () => {
+                    if (needHoliday && !holiday) throw new Error(t("err_holiday_req"));
+                    await onSave({ person, day, part, note, holiday: needHoliday ? holiday : null });
+                  })}>{t("save")}</button>
         </div>
       </div>
     </div>
