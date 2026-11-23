@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       db.from("leave_boards").select("id, name_hu, name_ro, sort").order("sort"),
       db.from("leave_types").select("code, name_hu, name_ro, color, sort").order("sort"),
       db.from("leave_entries").select("id, board_id, day, part, type_code, person:persons(name)")
-        .gte("day", from).lte("day", to).order("day"),
+        .gte("day", from).lte("day", to).eq("status", "ok").order("day"),
       db.from("blackout_periods").select("board_id, from_day, to_day, reason"),
       db.from("holidays").select("day, name_hu, name_ro").gte("day", from).lte("day", to),
       db.from("leave_rules").select("board_id, value").eq("key", "kijelzo_mod"),

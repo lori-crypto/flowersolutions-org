@@ -17,6 +17,10 @@ Utolsó frissítés: 2026-11-20
   Kovács Loránd jóváhagyó; automatikus, évente újrainduló iktatószám első nyomtatáskor.
   Beírás után felajánlja a nyomtatást, ill. 🖨 gomb a listákban. Nyitott kérdés a
   könyvelőnek: a tevékenység a Codul muncii 141. cikke alá esik-e (30 napos kiadás).
+- ✅ **Betelt napra: jóváhagyásra vár** (2026-11-23, `sql/42_jovahagyas.sql` lefutott):
+  a korlát feletti beírás `status='fuggo'`, Telegram-üzenet Jóváhagyom/Elutasítom gombbal
+  (a hőmérséklet-bot, `temp_config.leave_chat_id`), HR-doboz az appban; elutasítva a
+  kolléga listájában látszik. **Hátra: Lori privát /id számát beírni a leave_chat_id-be.**
 - ✅ **Számlálók + áthozott szabadság + kat./ort. szabály** (2026-11-23, `sql/41_keret_szamlalo.sql`
   lefutott): saját sor + HR „📊 Összesítő” (keret, tavalyról, kivett, maradt, ünnepnap X/Y,
   elmúlt-de-nincs-beírva) 2027. januártól; „tavalyról maradt” mező az Éves keretek alatt;

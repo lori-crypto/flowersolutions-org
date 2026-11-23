@@ -13,6 +13,7 @@ import {
   generateHolidays,
   usedQuotaDays, partWeight,
   COUNT_FROM_YEAR, holidayAlt, leaveSummary, loadLeaveOverview, LeaveSummary,
+  isOk, loadPending, decideLeave,
 } from "@/lib/leave";
 
 // Helyi dátum → YYYY-MM-DD (NEM UTC! különben UTC+2-ben egy napot csúszna)
@@ -72,6 +73,9 @@ export default function SzabadsagPage() {
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [editEntry, setEditEntry] = useState<LeaveEntry | null>(null);
   const [printIds, setPrintIds] = useState<string[] | null>(null); // beírás után: kérvény nyomtatása
+  const [pendingInfo, setPendingInfo] = useState<string[] | null>(null); // beírás után: függő napok
+  type PendRow = LeaveEntry & { board: { name_hu: string; name_ro: string | null } | null };
+  const [pending, setPending] = useState<PendRow[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
   const [quotasAll, setQuotasAll] = useState<Quota[]>([]);
   const [showSum, setShowSum] = useState(false);
@@ -108,6 +112,12 @@ export default function SzabadsagPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  // HR: függő kérések listája (minden táblán)
+  const refreshPending = useCallback(async () => {
+    try { setPending(await loadPending()); } catch { /* 42-es SQL előtt nincs status oszlop */ }
+  }, []);
+  useEffect(() => { if (st?.isHr) refreshPending(); }, [st, refreshPending]);
+
   useEffect(() => { if (st && boardId) reloadYear(boardId, year); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [boardId, year]);
@@ -122,7 +132,7 @@ export default function SzabadsagPage() {
 
   const entriesByDay = useMemo(() => {
     const m = new Map<string, LeaveEntry[]>();
-    for (const e of data?.entries ?? []) {
+    for (const e of (data?.entries ?? []).filter(x => x.status !== "elutasitva")) {
       const arr = m.get(e.day) ?? []; arr.push(e); m.set(e.day, arr);
     }
     return m;
@@ -149,7 +159,7 @@ export default function SzabadsagPage() {
 
   const dayFull = (day: string) => {
     const ppl = new Set((entriesByDay.get(day) ?? [])
-      .filter(e => typeMap.get(e.type_code)?.limit_szamit).map(e => e.person_id));
+      .filter(e => isOk(e) && typeMap.get(e.type_code)?.limit_szamit).map(e => e.person_id));
     return ppl.size >= lim;
   };
 
@@ -176,7 +186,7 @@ export default function SzabadsagPage() {
   };
   const usedHolidays = (personId: string, exceptId?: string) => {
     const used = new Set([...data.entries, ...data.myEntries, ...data.myHolEntries]
-      .filter(e => e.person_id === personId && e.id !== exceptId && e.holiday_day)
+      .filter(e => e.person_id === personId && e.id !== exceptId && e.holiday_day && e.status !== "elutasitva")
       .map(e => e.holiday_day as string));
     // katolikus VAGY ortodox: ha az egyikből már kivett, a másik nem választható (ugyanabban az évben)
     const picked = st.allHolidays.filter(h => used.has(h.day))
@@ -213,8 +223,8 @@ export default function SzabadsagPage() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   // A szabályok mindenkire érvényesek (HR-re is): zárolt vagy betelt napra nem megy beírás
-  const canWriteDay = (day: string) =>
-    !blockedDays.has(day) && !dayFull(day);
+  // betelt napra is lehet kérni — az jóváhagyásra vár (SQL 42)
+  const canWriteDay = (day: string) => !blockedDays.has(day);
 
   async function submitAdd(form: {
     person: string; from: string; to: string; part: Part; type: string;
@@ -248,12 +258,16 @@ export default function SzabadsagPage() {
       catch { /* már van bejegyzése azon a napon / zárolt / betelt — kihagyjuk */ }
     }
     await reloadYear();
+    const { data: ins } = await supabase.from("leave_entries").select("id, day, status, type_code")
+      .eq("person_id", form.person).in("type_code", [form.type, UNNEP]).in("day", [...days, ...holDays]);
+    const rows = (ins as { id: string; day: string; status?: string; type_code: string }[]) ?? [];
+    const pend = rows.filter(r => r.status === "fuggo").map(r => r.day).sort();
+    if (pend.length) setPendingInfo(pend);
     if (form.type === "szabadsag" || form.type === UNNEP) {
-      const { data: ins } = await supabase.from("leave_entries").select("id")
-        .eq("person_id", form.person).in("type_code", ["szabadsag", UNNEP]).in("day", [...days, ...holDays]);
-      const ids = ((ins as { id: string }[]) ?? []).map(x => x.id);
+      const ids = rows.filter(r => isOk(r) && (r.type_code === "szabadsag" || r.type_code === UNNEP)).map(r => r.id);
       if (ids.length) setPrintIds(ids);
     }
+    if (st?.isHr) refreshPending();
   }
 
   /** A beírt hétvégi ügyelet-mintát végigmásolja az év üres hétvégéire. */
@@ -301,14 +315,14 @@ export default function SzabadsagPage() {
     (e.person_id === st.me?.id && !!typeMap.get(e.type_code)?.self_service && e.day >= todayIso);
 
   // Kérvény nyomtatása: saját bejegyzés vagy HR; szabadságnál az egybefüggő időszak egy lapon
-  const canPrint = (e: LeaveEntry) =>
+  const canPrint = (e: LeaveEntry) => isOk(e) &&
     (e.type_code === "szabadsag" || e.type_code === UNNEP) && (st.isHr || e.person_id === st.me?.id);
   const openPrint = (ids: string[]) =>
     window.open("/szabadsag/cerere?ids=" + ids.join(","), "_blank");
   const printFor = (e: LeaveEntry) => {
     if (e.type_code !== "szabadsag") return openPrint([e.id]);
     const mine = [...new Map([...data.entries, ...data.myEntries]
-      .filter(x => x.person_id === e.person_id && x.type_code === "szabadsag")
+      .filter(x => x.person_id === e.person_id && x.type_code === "szabadsag" && isOk(x))
       .map(x => [x.id, x])).values()].sort((a, b) => a.day.localeCompare(b.day));
     const isGapFree = (a: string, b: string) => {
       const d = new Date(a + "T00:00:00"); d.setDate(d.getDate() + 1);
@@ -323,7 +337,7 @@ export default function SzabadsagPage() {
     // az időszakba eső, napján kivett ünnepnapok külön kérvénye is menjen vele
     const a = mine[lo].day, b = mine[hi].day;
     const hols = [...new Map([...data.entries, ...data.myEntries]
-      .filter(x => x.person_id === e.person_id && x.type_code === UNNEP && x.day > a && x.day < b
+      .filter(x => x.person_id === e.person_id && x.type_code === UNNEP && isOk(x) && x.day > a && x.day < b
         && (x.holiday_day ?? x.day) === x.day)
       .map(x => [x.id, x])).values()].map(x => x.id);
     openPrint([...mine.slice(lo, hi + 1).map(x => x.id), ...hols]);
@@ -452,12 +466,12 @@ export default function SzabadsagPage() {
                   {es.map(e => {
                     const ty = typeMap.get(e.type_code);
                     return (
-                      <span key={e.id} className={"entry-chip" + (canManage(e) ? " editable" : "")}
+                      <span key={e.id} className={"entry-chip" + (canManage(e) ? " editable" : "") + (e.status === "fuggo" ? " pending" : "")}
                             style={{ background: ty?.color }}
                             onClick={canManage(e)
                               ? ev => { ev.stopPropagation(); setEditEntry(e); } : undefined}
                             title={(e.person?.name ?? "?") + " · " + pick(ty?.name_hu ?? "", ty?.name_ro) + (holFor(e) ? " · " + holFor(e) : "") + (e.note ? " — " + e.note : "")}>
-                        {shortName(e.person?.name ?? "?")}
+                        {e.status === "fuggo" && "⏳ "}{shortName(e.person?.name ?? "?")}
                         {e.part !== "egesz" && <em>½{e.part === "de" ? "DE" : "DU"}</em>}
                         {canManage(e) && day >= todayIso && (
                           <button className="chip-del"
@@ -466,7 +480,7 @@ export default function SzabadsagPage() {
                       </span>
                     );
                   })}
-                  {full && !blocked && <span className="full-tag">{t("full")} ({lim})</span>}
+                  {full && !blocked && <span className="full-tag">{t("full_pending")} ({lim})</span>}
                 </div>
                 <button className="day-add" disabled={!canWriteDay(day)}
                         onClick={ev => { ev.stopPropagation(); setShowAdd({ from: day, to: day }); }}>＋</button>
@@ -501,7 +515,8 @@ export default function SzabadsagPage() {
                       const ty = typeMap.get(e.type_code);
                       return (e.person?.name ?? "?") +
                         (e.part !== "egesz" ? " (½" + (e.part === "de" ? "DE" : "DU") + ")" : "") +
-                        " — " + pick(ty?.name_hu ?? "", ty?.name_ro);
+                        " — " + pick(ty?.name_hu ?? "", ty?.name_ro) +
+                        (e.status === "fuggo" ? " ⏳ " + t("st_pending") : "");
                     }),
                   ].filter(Boolean).join("\n");
                   return (
@@ -513,7 +528,8 @@ export default function SzabadsagPage() {
                       <span className="wtags">
                         {hol && <span className="wstar">★</span>}
                         {es.slice(0, 4).map(e => (
-                          <i key={e.id} style={{ background: typeMap.get(e.type_code)?.color }}>
+                          <i key={e.id} className={e.status === "fuggo" ? "pending" : undefined}
+                             style={{ background: typeMap.get(e.type_code)?.color }}>
                             {shortName(e.person?.name ?? "?")}
                           </i>
                         ))}
@@ -543,6 +559,8 @@ export default function SzabadsagPage() {
               <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)} · {pick(b?.name_hu ?? "", b?.name_ro)}</span>
               {holFor(e) && <span className="muted">{holFor(e)}</span>}
               <span className="muted">({partWeight(e.part)} {t("day_unit")})</span>
+              {e.status === "fuggo" && <span className="st-badge st-pend">⏳ {t("st_pending")}</span>}
+              {e.status === "elutasitva" && <span className="st-badge st-rej">✕ {t("st_rejected")}{e.decided_by ? " · " + e.decided_by : ""}</span>}
               {canPrint(e) && <button className="pencil" title={t("print_req")} onClick={() => printFor(e)}>🖨</button>}
               {canManage(e) && (
                 <>
@@ -554,6 +572,57 @@ export default function SzabadsagPage() {
           );
         })}
       </div>
+
+      {/* HR: jóváhagyásra váró kérések */}
+      {st.isHr && pending.length > 0 && (() => {
+        const groups = new Map<string, PendRow[]>();
+        for (const e of pending) { const k = e.pending_group ?? e.id; groups.set(k, [...(groups.get(k) ?? []), e]); }
+        return (
+          <div className="admin-box" style={{ paddingBottom: 12 }}>
+            <div className="pend-box">
+              <h3>⏳ {t("st_pending")} ({groups.size})</h3>
+              {[...groups.entries()].map(([g, list]) => {
+                const f = list[0];
+                const ty = typeMap.get(f.type_code);
+                const away = [...new Set(list.flatMap(x => (entriesByDay.get(x.day) ?? [])
+                  .filter(o => isOk(o) && o.board_id === x.board_id && o.person_id !== x.person_id
+                    && typeMap.get(o.type_code)?.limit_szamit).map(o => o.person?.name ?? "?")))];
+                return (
+                  <div className="pend-row" key={g}>
+                    <div style={{ flex: 1 }}>
+                      <b>{f.person?.name ?? "?"}</b> · {pick(f.board?.name_hu ?? "", f.board?.name_ro)} · {pick(ty?.name_hu ?? "", ty?.name_ro)}
+                      <div>{list.map(x => x.day + (x.part !== "egesz" ? (x.part === "de" ? " ½DE" : " ½DU") : "")).join(", ")}</div>
+                      {f.note && <div className="muted">„{f.note}”</div>}
+                      {away.length > 0 && <div className="muted">{t("away_already")}: {away.join(", ")}</div>}
+                    </div>
+                    <button className="btn-save" onClick={async () => {
+                      try { await decideLeave(g, true); await refreshPending(); await reloadYear(); }
+                      catch (e) { alert((e as Error).message); }
+                    }}>✓ {t("approve")}</button>
+                    <button className="btn-cancel" onClick={async () => {
+                      try { await decideLeave(g, false); await refreshPending(); await reloadYear(); }
+                      catch (e) { alert((e as Error).message); }
+                    }}>✕ {t("reject")}</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {pendingInfo && !printIds && (
+        <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setPendingInfo(null); }}>
+          <div className="modal">
+            <h3>⏳ {t("pending_days")}</h3>
+            <p style={{ margin: "8px 0 6px" }}>{t("pending_saved")}</p>
+            <p className="muted" style={{ margin: "0 0 14px" }}>{pendingInfo.join(", ")}</p>
+            <div className="btns">
+              <button className="btn-save" onClick={() => setPendingInfo(null)}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* HR beállítások */}
       {st.isHr && counting && (
@@ -680,6 +749,7 @@ export default function SzabadsagPage() {
                     <span className="muted">{pick(ty?.name_hu ?? "", ty?.name_ro)}</span>
                     {holFor(e) && <span className="muted">{holFor(e)}</span>}
                     {e.note && <span className="muted">„{e.note}”</span>}
+                    {e.status === "fuggo" && <span className="st-badge st-pend">⏳ {t("st_pending")}</span>}
                     {canPrint(e) && <button className="pencil" title={t("print_req")} onClick={() => printFor(e)}>🖨</button>}
                     {canManage(e) && (
                       <>

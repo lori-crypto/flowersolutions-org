@@ -12,7 +12,13 @@ export type LeaveEntry = {
   type_code: string; note: string | null; person: Person | null;
   /** kivett ünnepnapnál: melyik ünnepnap helyett (SQL 39) */
   holiday_day?: string | null;
+  /** ok | fuggo (betelt napra, jóváhagyásra vár) | elutasitva (SQL 42) */
+  status?: "ok" | "fuggo" | "elutasitva";
+  pending_group?: string | null;
+  decided_by?: string | null;
 };
+/** érvényes (jóváhagyott) bejegyzés — a régi, státusz nélküli sorok is azok */
+export const isOk = (e: { status?: string }) => !e.status || e.status === "ok";
 export type Blackout = {
   id: string; board_id: string; from_day: string; to_day: string; reason: string | null;
 };
@@ -139,6 +145,20 @@ export async function updateBlackout(id: string, from: string, to: string, reaso
     .update({ from_day: from, to_day: to, reason: reason || null }).eq("id", id);
   fail(error);
 }
+/** HR: függő kérések (minden táblán) */
+export async function loadPending() {
+  const { data, error } = await supabase.from("leave_entries")
+    .select("*, person:persons(*), board:leave_boards(name_hu, name_ro)")
+    .eq("status", "fuggo").order("day");
+  if (error && /status/i.test(error.message || "")) return [];
+  fail(error);
+  return (data as (LeaveEntry & { board: { name_hu: string; name_ro: string | null } | null })[]) ?? [];
+}
+export async function decideLeave(group: string, ok: boolean) {
+  const { error } = await supabase.rpc("app_leave_decide", { p_group: group, p_ok: ok });
+  fail(error);
+}
+
 export async function setRule(boardId: string, key: string, value: string) {
   const { error } = await supabase.from("leave_rules").upsert({ board_id: boardId, key, value });
   fail(error);
@@ -268,6 +288,7 @@ export type LeaveSummary = {
  */
 export function leaveSummary(quota: Quota | null, szab: LeaveEntry[], unnep: LeaveEntry[],
                              hols: Holiday[], today: string): LeaveSummary {
+  szab = szab.filter(isOk); unnep = unnep.filter(isOk);
   const used = szab.filter(e => e.type_code === "szabadsag").reduce((s, e) => s + partWeight(e.part), 0);
   const carry = Number(quota?.carry_over ?? 0);
   const q = quota ? Number(quota.days) : null;

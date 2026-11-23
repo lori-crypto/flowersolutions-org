@@ -184,6 +184,7 @@ function CererePage() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [hols, setHols] = useState<Holiday[]>([]);
   const [err, setErr] = useState("");
+  const [skipped, setSkipped] = useState(0); // függő / elutasított → nem nyomtatjuk
 
   useEffect(() => {
     // csak helyi fejlesztéskor: minta-adat a kinézet ellenőrzéséhez (?demo=1)
@@ -207,7 +208,9 @@ function CererePage() {
         supabase.from("holidays").select("*"),
       ]);
       if (eq.error || hq.error) { setErr((eq.error || hq.error)!.message); return; }
-      setRows((eq.data as Row[]) ?? []);
+      const all = (eq.data as Row[]) ?? [];
+      setSkipped(all.filter(r => r.status && r.status !== "ok").length);
+      setRows(all.filter(r => !r.status || r.status === "ok"));
       setHols((hq.data as Holiday[]) ?? []);
     })();
   }, [q]);
@@ -266,6 +269,9 @@ function CererePage() {
         )}
         {comp.some(r => !r.holiday_day) && (
           <div className="c-warn">⚠ Van kivett ünnepnap, amelynél nincs megadva, melyik ünnep helyett — a lapon üresen marad, kézzel töltsd ki, vagy szerkeszd a bejegyzést.</div>
+        )}
+        {skipped > 0 && (
+          <div className="c-warn">⏳ {skipped} nap még jóváhagyásra vár (vagy elutasították) — arra nem készül kérvény.</div>
         )}
         {rows.some(r => r.type_code !== "szabadsag" && r.type_code !== UNNEP) && (
           <div className="c-warn">Ügyeletre és betegszabadságra nem készül kérvény.</div>
